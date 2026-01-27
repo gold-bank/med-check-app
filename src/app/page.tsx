@@ -1,65 +1,258 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Header } from '@/components/Header';
+import { TimeCard } from '@/components/TimeCard';
+import { MedicineItem } from '@/components/MedicineItem';
+import { AlertSection } from '@/components/AlertSection';
+import { Confetti } from '@/components/Confetti';
+import { safeGetItem, safeSetItem, safeClear } from '@/lib/storage';
+import { BASE_MEDICINES, TIME_SLOTS, type TimeSlot, type Medicine } from '@/lib/medicines';
+
+// D3 사이클 계산
+function calculateD3Status(cycleStart: string, cyclePeriod: number): { isActive: boolean; badge: string } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(cycleStart);
+  start.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const remainder = diffDays % cyclePeriod;
+  const daysLeft = (cyclePeriod - remainder) % cyclePeriod;
+
+  if (remainder === 0) {
+    return { isActive: true, badge: 'TODAY' };
+  }
+  return { isActive: false, badge: `D-${daysLeft}` };
+}
+
+// MTX 사이클 계산
+function calculateMTXStatus(targetDay: number): { isActive: boolean; badge: string } {
+  const today = new Date();
+  const currentDay = today.getDay();
+
+  if (currentDay === targetDay) {
+    return { isActive: true, badge: 'TODAY' };
+  }
+
+  const diff = (targetDay + 7 - currentDay) % 7;
+  return { isActive: false, badge: `D-${diff}` };
+}
+
+export default function MedicineSchedule() {
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const prevAllCheckedRef = useRef(false);
+
+  // 화요일 규칙 적용
+  const isTuesday = new Date().getDay() === 2;
+
+  // 약 목록을 시간대별로 그룹화 (화요일 규칙 적용)
+  const medicinesBySlot = useMemo(() => {
+    const result: Record<TimeSlot, Medicine[]> = {
+      dawn: [],
+      morning: [],
+      noon: [],
+      snack: [],
+      evening: [],
+      night: [],
+    };
+
+    BASE_MEDICINES.forEach((med) => {
+      // 화요일이면 엽산을 저녁으로 이동
+      if (med.tuesdayEvening && isTuesday) {
+        result.evening.push({ ...med, slot: 'evening' });
+      } else {
+        result[med.slot].push(med);
+      }
+    });
+
+    // 각 시간대 내 정렬 (D3, MTX는 마지막에)
+    Object.keys(result).forEach((slot) => {
+      result[slot as TimeSlot].sort((a, b) => {
+        if (a.cycleType && !b.cycleType) return 1;
+        if (!a.cycleType && b.cycleType) return -1;
+        return 0;
+      });
+    });
+
+    return result;
+  }, [isTuesday]);
+
+  // localStorage에서 상태 로드
+  useEffect(() => {
+    const loadedState: Record<string, boolean> = {};
+    BASE_MEDICINES.forEach((med) => {
+      const value = safeGetItem(med.id);
+      if (value !== null) {
+        loadedState[med.id] = value === '1';
+      }
+    });
+    setCheckedItems(loadedState);
+    setIsLoaded(true);
+  }, []);
+
+  // 체크 상태 변경 핸들러
+  const handleMedicineChange = useCallback((id: string, checked: boolean) => {
+    setCheckedItems((prev) => {
+      const newState = { ...prev, [id]: checked };
+      safeSetItem(id, checked ? '1' : '0');
+      return newState;
+    });
+  }, []);
+
+  // 그룹 토글 핸들러
+  const handleGroupToggle = useCallback((slot: TimeSlot) => {
+    const medsInSlot = medicinesBySlot[slot];
+    const enabledMeds = medsInSlot.filter((med) => {
+      if (med.cycleType === 'D3' && med.cycleStart && med.cyclePeriod) {
+        return calculateD3Status(med.cycleStart, med.cyclePeriod).isActive;
+      }
+      if (med.cycleType === 'MTX' && med.targetDay !== undefined) {
+        return calculateMTXStatus(med.targetDay).isActive;
+      }
+      return true;
+    });
+
+    const allChecked = enabledMeds.every((med) => checkedItems[med.id]);
+    const newCheckedValue = !allChecked;
+
+    setCheckedItems((prev) => {
+      const newState = { ...prev };
+      enabledMeds.forEach((med) => {
+        newState[med.id] = newCheckedValue;
+        safeSetItem(med.id, newCheckedValue ? '1' : '0');
+      });
+      return newState;
+    });
+  }, [medicinesBySlot, checkedItems]);
+
+  // 그룹 체크 상태 계산
+  const isGroupChecked = useCallback((slot: TimeSlot): boolean => {
+    const medsInSlot = medicinesBySlot[slot];
+    const enabledMeds = medsInSlot.filter((med) => {
+      if (med.cycleType === 'D3' && med.cycleStart && med.cyclePeriod) {
+        return calculateD3Status(med.cycleStart, med.cyclePeriod).isActive;
+      }
+      if (med.cycleType === 'MTX' && med.targetDay !== undefined) {
+        return calculateMTXStatus(med.targetDay).isActive;
+      }
+      return true;
+    });
+
+    if (enabledMeds.length === 0) return false;
+    return enabledMeds.every((med) => checkedItems[med.id]);
+  }, [medicinesBySlot, checkedItems]);
+
+  // 초기화 핸들러
+  const handleReset = useCallback(() => {
+    safeClear();
+    setCheckedItems({});
+    setShowConfetti(false);
+    prevAllCheckedRef.current = false;
+  }, []);
+
+  // 모든 항목 체크 여부 확인 (Confetti 트리거)
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const enabledMeds = BASE_MEDICINES.filter((med) => {
+      if (med.cycleType === 'D3' && med.cycleStart && med.cyclePeriod) {
+        return calculateD3Status(med.cycleStart, med.cyclePeriod).isActive;
+      }
+      if (med.cycleType === 'MTX' && med.targetDay !== undefined) {
+        return calculateMTXStatus(med.targetDay).isActive;
+      }
+      return true;
+    });
+
+    const allChecked = enabledMeds.length > 0 && enabledMeds.every((med) => checkedItems[med.id]);
+
+    if (allChecked && !prevAllCheckedRef.current) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 100);
+    }
+
+    prevAllCheckedRef.current = allChecked;
+  }, [checkedItems, isLoaded]);
+
+  // 약 아이템 렌더링
+  const renderMedicine = (med: Medicine) => {
+    let isDisabled = false;
+    let isActiveToday = false;
+    let isDanger = false;
+    let badge: string | undefined;
+
+    if (med.cycleType === 'D3' && med.cycleStart && med.cyclePeriod) {
+      const status = calculateD3Status(med.cycleStart, med.cyclePeriod);
+      isDisabled = !status.isActive;
+      isActiveToday = status.isActive;
+      badge = status.badge;
+    }
+
+    if (med.cycleType === 'MTX' && med.targetDay !== undefined) {
+      const status = calculateMTXStatus(med.targetDay);
+      isDisabled = !status.isActive;
+      isDanger = status.isActive;
+      badge = status.badge;
+    }
+
+    // 화요일 엽산 특별 표시
+    const showFolicWarning = med.tuesdayEvening && isTuesday;
+    const forceWrap = showFolicWarning;
+
+    return (
+      <MedicineItem
+        key={med.id}
+        id={med.id}
+        name={med.name}
+        dose={med.dose}
+        checked={checkedItems[med.id] || false}
+        disabled={isDisabled}
+        isActiveToday={isActiveToday}
+        isDanger={isDanger}
+        badge={badge}
+        dayBadge={med.cycleType === 'MTX' ? '월요일' : undefined}
+        showFolicWarning={showFolicWarning}
+        forceWrap={forceWrap}
+        onChange={handleMedicineChange}
+      />
+    );
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="main-container">
+        <div style={{ padding: 20, textAlign: 'center' }}>로딩 중...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <>
+      <Confetti trigger={showConfetti} />
+      <div className="main-container">
+        <Header onReset={handleReset} />
+
+        <div className="schedule-flow">
+          {TIME_SLOTS.map((slot) => (
+            <TimeCard
+              key={slot.id}
+              slotId={slot.id}
+              label={slot.label}
+              iconName={slot.icon}
+              notes={slot.notes}
+              allChecked={isGroupChecked(slot.id)}
+              onGroupToggle={() => handleGroupToggle(slot.id)}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {medicinesBySlot[slot.id].map(renderMedicine)}
+            </TimeCard>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        <AlertSection />
+      </div>
+    </>
   );
 }

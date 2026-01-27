@@ -1,0 +1,24 @@
+{
+    "name": "약복용 스케줄",
+    "short_name": "약복용",
+    "description": "매일 복용 기록하기",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#f4f5f7",
+    "theme_color": "#ffffff",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/pill-icon.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/pill-icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
