@@ -83,7 +83,7 @@ export const BASE_MEDICINES: Medicine[] = [
         dose: '(4000 IU)',
         slot: 'noon',
         cycleType: 'D3',
-        cycleStart: '2026-01-24',
+        cycleStart: '2026-01-28',
         cyclePeriod: 3,
     },
 
