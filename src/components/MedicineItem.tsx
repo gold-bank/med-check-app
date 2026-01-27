@@ -26,7 +26,6 @@ export function MedicineItem({
     badge,
     dayBadge,
     showFolicWarning = false,
-    forceWrap = false,
     onChange,
 }: MedicineItemProps) {
     const handleClick = () => {
@@ -52,16 +51,16 @@ export function MedicineItem({
     const shouldBadgeBeGray = disabled || checked;
 
     const getDayBadgeClass = () => {
-        if (shouldBadgeBeGray) return 'day-badge badge-gray';
-        if (isDanger) return 'day-badge badge-danger';
-        return 'day-badge badge-gray';
+        if (shouldBadgeBeGray) return 'med-badge badge-gray';
+        if (isDanger) return 'med-badge badge-danger';
+        return 'med-badge badge-gray';
     };
 
     const getDDayBadgeClass = () => {
-        if (shouldBadgeBeGray) return 'd-day-badge badge-gray';
-        if (isDanger) return 'd-day-badge badge-danger';
-        if (isActiveToday) return 'd-day-badge badge-active';
-        return 'd-day-badge badge-gray';
+        if (shouldBadgeBeGray) return 'med-badge badge-gray';
+        if (isDanger) return 'med-badge badge-danger';
+        if (isActiveToday) return 'med-badge badge-active';
+        return 'med-badge badge-gray';
     };
 
     return (
@@ -81,19 +80,22 @@ export function MedicineItem({
                 }}
             >
                 <div className="check-circle" />
-                <div className={`med-text-wrapper ${forceWrap ? 'force-wrap' : ''}`}>
-                    <span className="med-name">
-                        {name}
-                        {dayBadge && <span className={getDayBadgeClass()}>{dayBadge}</span>}
-                        {' '}
-                        {badge && <span className={getDDayBadgeClass()}>{badge}</span>}
-                    </span>
-                    <span className="med-dose">
-                        {dose}
-                        {showFolicWarning && (
-                            <span className="folic-warning">★화요일은 저녁 복용★</span>
-                        )}
-                    </span>
+                {/* 텍스트 래퍼: flex-wrap으로 긴 텍스트 줄바꿈 허용 */}
+                <div className="med-text-wrapper">
+                    {/* 이름 */}
+                    <span className="med-name">{name}</span>
+
+                    {/* 용량 (이름 바로 다음) */}
+                    {dose && <span className="med-dose">{dose}</span>}
+
+                    {/* 화요일 엽산 경고 */}
+                    {showFolicWarning && (
+                        <span className="folic-warning">★화요일은 저녁 복용★</span>
+                    )}
+
+                    {/* 뱃지들 (항상 마지막) */}
+                    {dayBadge && <span className={getDayBadgeClass()}>{dayBadge}</span>}
+                    {badge && <span className={getDDayBadgeClass()}>{badge}</span>}
                 </div>
             </div>
         </div>
