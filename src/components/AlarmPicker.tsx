@@ -132,8 +132,8 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
                             onClick={() => handleSlotChange(slot.id)}
                         >
                             <span className="slot-name">{SLOT_LABELS[slot.id]}</span>
-                            <span className="slot-time-display">
-                                {localSettings[slot.id].isOn ? localSettings[slot.id].time : '--:--'}
+                            <span className={`slot-time-display ${!localSettings[slot.id].isOn ? 'dimmed' : ''}`}>
+                                {localSettings[slot.id].time}
                             </span>
                             <button
                                 className={`slot-switch ${localSettings[slot.id].isOn ? 'on' : ''}`}

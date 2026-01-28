@@ -767,6 +767,10 @@ body {
   margin-right: 10px;
 }
 
+.slot-time-display.dimmed {
+  opacity: 0.4;
+}
+
 .slot-switch {
   font-size: 10px;
   font-weight: 700;
