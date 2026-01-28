@@ -77,8 +77,18 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
-    } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: any) {
+        console.error('API Error Details:', {
+            message: error.message,
+            stack: error.stack,
+            envCheck: {
+                hasApiKey: !!process.env.ONESIGNAL_REST_API_KEY,
+                hasAppId: !!process.env.ONESIGNAL_APP_ID
+            }
+        });
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            details: error.message
+        }, { status: 500 });
     }
 }
