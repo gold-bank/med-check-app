@@ -14,6 +14,9 @@ interface TimeCardProps {
     allChecked: boolean;
     onGroupToggle: () => void;
     children: ReactNode;
+    alarmTime?: string;
+    isAlarmOn?: boolean;
+    onAlarmToggle?: () => void;
 }
 
 export function TimeCard({
@@ -23,7 +26,17 @@ export function TimeCard({
     allChecked,
     onGroupToggle,
     children,
+    alarmTime,
+    isAlarmOn = false,
+    onAlarmToggle,
 }: TimeCardProps) {
+    const handleClockClick = (e: React.MouseEvent) => {
+        e.stopPropagation(); // 그룹 토글 방지
+        if (onAlarmToggle) {
+            onAlarmToggle();
+        }
+    };
+
     return (
         <div className="time-card">
             <div
@@ -42,6 +55,15 @@ export function TimeCard({
                     <Icon name={iconName as IconName} />
                 </div>
                 <div className="visual-time">{label}</div>
+                {alarmTime && (
+                    <div
+                        className={`visual-clock ${isAlarmOn ? 'active' : 'off'}`}
+                        onClick={handleClockClick}
+                        title={isAlarmOn ? '알림 켜짐 - 클릭하여 끄기' : '알림 꺼짐 - 클릭하여 켜기'}
+                    >
+                        {alarmTime}
+                    </div>
+                )}
             </div>
             <div className="card-content">
                 <div className="content-meds">

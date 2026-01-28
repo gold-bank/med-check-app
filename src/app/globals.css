@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 @import "tailwindcss";
 
 /* ===== 커스텀 테마 색상 (Tailwind CSS 4) ===== */
@@ -233,8 +234,12 @@ body {
   position: relative;
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
   -webkit-touch-callout: none;
-  padding: 8px 5px 5px 5px;
+  padding: 8px 5px 12px 5px;
+  /* 하단 여백 조정 */
   margin-top: -3px;
+  /* 세로 늘어남 방지 - 터치 영역 최적화 */
+  align-self: flex-start;
+  height: auto;
 }
 
 .picto-box {
@@ -272,7 +277,37 @@ body {
   margin-bottom: 2px;
   letter-spacing: -0.5px;
   pointer-events: none;
+  white-space: nowrap;
 }
+
+/* 전자시계 스타일 (배경 제거, 순수 숫자 강조) */
+.visual-clock {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: #333;
+  background: none;
+  padding: 0;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  transition: all 0.2s;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.visual-clock.active {
+  color: #1976D2;
+  font-weight: bold;
+}
+
+.visual-clock.off {
+  color: #ccc;
+}
+
+.visual-clock:active {
+  transform: scale(0.95);
+}
+
 
 /* ===== 카드 콘텐츠 ===== */
 .card-content {
@@ -467,10 +502,10 @@ body {
 .day-badge,
 .d-day-badge {
   display: inline-block;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 5px;
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
   font-weight: 800;
   vertical-align: middle;
   transition: background-color 0.2s, color 0.2s;
@@ -638,4 +673,204 @@ body {
   .alert-title-main {
     font-size: 13px;
   }
+}
+
+/* ===== 알람 피커 모달 ===== */
+.alarm-picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.alarm-picker-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 380px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.alarm-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.alarm-picker-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+}
+
+.alarm-picker-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #666;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.alarm-picker-close:hover {
+  background: #f0f0f0;
+}
+
+/* 슬롯 목록 */
+.alarm-picker-slots {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alarm-slot-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #f9f9f9;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.alarm-slot-btn.active {
+  border-color: #007AFF;
+  background: #E8F4FF;
+}
+
+.alarm-slot-btn .slot-label {
+  flex: 1;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.alarm-slot-btn .slot-time {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: #666;
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.alarm-slot-btn.active .slot-time {
+  background: #222;
+  color: #0f0;
+}
+
+.slot-toggle {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #ddd;
+  color: #888;
+}
+
+.slot-toggle.on {
+  background: #34C759;
+  color: #fff;
+}
+
+/* 시간 피커 영역 */
+.alarm-picker-time {
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
+  background: #fafafa;
+}
+
+.picker-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.picker-wheels {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.picker-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.picker-column-label {
+  font-size: 11px;
+  color: #888;
+  font-weight: 600;
+}
+
+.picker-select {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+  color: #333;
+  text-align: center;
+  cursor: pointer;
+  min-width: 80px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.picker-select:focus {
+  outline: none;
+  border-color: #007AFF;
+}
+
+/* 저장 버튼 */
+.alarm-picker-actions {
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
+}
+
+.alarm-save-btn {
+  width: 100%;
+  padding: 14px;
+  background: #007AFF;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.alarm-save-btn:hover {
+  background: #0056b3;
+}
+
+.alarm-save-btn:active {
+  transform: scale(0.98);
 }

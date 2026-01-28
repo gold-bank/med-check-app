@@ -6,8 +6,19 @@ import { TimeCard } from '@/components/TimeCard';
 import { MedicineItem } from '@/components/MedicineItem';
 import { AlertSection } from '@/components/AlertSection';
 import { Confetti } from '@/components/Confetti';
+import { AlarmPicker } from '@/components/AlarmPicker';
 import { safeGetItem, safeSetItem, safeClear } from '@/lib/storage';
 import { BASE_MEDICINES, TIME_SLOTS, type TimeSlot, type Medicine } from '@/lib/medicines';
+
+// 알림 시간 기본값
+const DEFAULT_ALARM_TIMES: Record<TimeSlot, string> = {
+  dawn: '07:00',
+  morning: '08:00',
+  noon: '12:00',
+  snack: '15:00',
+  evening: '18:00',
+  night: '22:00',
+};
 
 // D3 사이클 계산
 function calculateD3Status(cycleStart: string, cyclePeriod: number): { isActive: boolean; badge: string } {
@@ -44,6 +55,17 @@ export default function MedicineSchedule() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const prevAllCheckedRef = useRef(false);
+  const [isAlarmPickerOpen, setIsAlarmPickerOpen] = useState(false);
+
+  // 알람 상태 관리
+  const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean }>>({
+    dawn: { time: DEFAULT_ALARM_TIMES.dawn, isOn: false },
+    morning: { time: DEFAULT_ALARM_TIMES.morning, isOn: false },
+    noon: { time: DEFAULT_ALARM_TIMES.noon, isOn: false },
+    snack: { time: DEFAULT_ALARM_TIMES.snack, isOn: false },
+    evening: { time: DEFAULT_ALARM_TIMES.evening, isOn: false },
+    night: { time: DEFAULT_ALARM_TIMES.night, isOn: false },
+  });
 
   // 화요일 규칙 적용
   const isTuesday = new Date().getDay() === 2;
@@ -90,7 +112,44 @@ export default function MedicineSchedule() {
       }
     });
     setCheckedItems(loadedState);
+
+    // 알람 설정 로드
+    const savedAlarms = safeGetItem('alarmSettings');
+    if (savedAlarms) {
+      try {
+        const parsed = JSON.parse(savedAlarms);
+        setAlarmSettings(parsed);
+      } catch (e) {
+        console.error('알람 설정 로드 실패:', e);
+      }
+    }
+
     setIsLoaded(true);
+  }, []);
+
+  // 알람 토글 핸들러
+  const handleAlarmToggle = useCallback((slot: TimeSlot) => {
+    setAlarmSettings((prev) => {
+      const newSettings = {
+        ...prev,
+        [slot]: { ...prev[slot], isOn: !prev[slot].isOn },
+      };
+      safeSetItem('alarmSettings', JSON.stringify(newSettings));
+      return newSettings;
+    });
+  }, []);
+
+  // 알람 설정 버튼 클릭
+  const handleAlarmSettingClick = useCallback(() => {
+    setIsAlarmPickerOpen(true);
+  }, []);
+
+  // 알람 설정 저장
+  const handleAlarmSave = useCallback((newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {
+    setAlarmSettings(newSettings);
+    safeSetItem('alarmSettings', JSON.stringify(newSettings));
+    // TODO: OneSignal 예약 API 연동
+    console.log('알람 설정 저장됨:', newSettings);
   }, []);
 
   // 체크 상태 변경 핸들러
@@ -233,7 +292,7 @@ export default function MedicineSchedule() {
     <>
       <Confetti trigger={showConfetti} />
       <div className="main-container">
-        <Header onReset={handleReset} />
+        <Header onReset={handleReset} onAlarmSettingClick={handleAlarmSettingClick} />
 
         <div className="schedule-flow">
           {TIME_SLOTS.map((slot) => (
@@ -245,6 +304,9 @@ export default function MedicineSchedule() {
               notes={slot.notes}
               allChecked={isGroupChecked(slot.id)}
               onGroupToggle={() => handleGroupToggle(slot.id)}
+              alarmTime={alarmSettings[slot.id].time}
+              isAlarmOn={alarmSettings[slot.id].isOn}
+              onAlarmToggle={() => handleAlarmToggle(slot.id)}
             >
               {medicinesBySlot[slot.id].map(renderMedicine)}
             </TimeCard>
@@ -253,6 +315,14 @@ export default function MedicineSchedule() {
 
         <AlertSection />
       </div>
+
+      {/* 알람 피커 모달 */}
+      <AlarmPicker
+        isOpen={isAlarmPickerOpen}
+        onClose={() => setIsAlarmPickerOpen(false)}
+        alarmSettings={alarmSettings}
+        onSave={handleAlarmSave}
+      />
     </>
   );
 }

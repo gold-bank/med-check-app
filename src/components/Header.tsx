@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { Bell } from 'lucide-react';
 
 interface HeaderProps {
     onReset: () => void;
+    onAlarmSettingClick?: () => void;
 }
 
-export function Header({ onReset }: HeaderProps) {
+export function Header({ onReset, onAlarmSettingClick }: HeaderProps) {
     const [isUpdating, setIsUpdating] = useState(false);
 
     const today = new Date();
@@ -55,7 +57,27 @@ export function Header({ onReset }: HeaderProps) {
             <div className="header-title-area">
                 <h1>약복용 스케줄</h1>
                 <p>오늘도 건강한 하루 보내세요!</p>
-                <div className="reset-wrapper">
+                <div className="reset-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    {/* 왼쪽: 종 아이콘 (피크토박스 스타일) */}
+                    {onAlarmSettingClick && (
+                        <div
+                            className="picto-box"
+                            onClick={onAlarmSettingClick}
+                            title="알림 설정"
+                            style={{
+                                width: '34px',
+                                height: '34px',
+                                marginBottom: 0,
+                                cursor: 'pointer',
+                                background: '#f8f9fa',
+                            }}
+                        >
+                            <Bell size={18} color="#555" />
+                        </div>
+                    )}
+                    {!onAlarmSettingClick && <div />}
+
+                    {/* 오른쪽: 초기화 버튼 */}
                     <button
                         type="button"
                         className="reset-btn"

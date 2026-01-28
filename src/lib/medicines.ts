@@ -54,7 +54,7 @@ export const TIME_SLOTS: TimeSlotInfo[] = [
     },
     {
         id: 'night',
-        label: '식사30분 뒤',
+        label: '식후 30분',
         icon: 'wait',
         notes: ['천연 신경안정제 (숙면 유도)', '씬지록신과 8시간 이상 간격'],
     },
