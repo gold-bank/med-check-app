@@ -72,19 +72,23 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
         return `${String(h).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
     };
 
-    // 슬롯 변경 시 해당 시간으로 업데이트
-    const handleSlotChange = (slot: TimeSlot) => {
-        // 현재 선택된 슬롯의 변경사항을 localSettings에 임시 저장
-        const currentTime = stateToTimeString(amPm, hour, minute);
-        const updatedSettings = {
-            ...localSettings,
-            [selectedSlot]: { ...localSettings[selectedSlot], time: currentTime }
-        };
-        setLocalSettings(updatedSettings);
+    // 휠 변경 시 즉시 상태 및 localSettings 업데이트
+    const updateTimeSettings = (newAmPm: '오전' | '오후', newHour: number, newMinute: number) => {
+        setAmPm(newAmPm);
+        setHour(newHour);
+        setMinute(newMinute);
 
-        // 새 슬롯으로 전환 및 해당 슬롯의 시간 로드
+        const currentTime = stateToTimeString(newAmPm, newHour, newMinute);
+        setLocalSettings(prev => ({
+            ...prev,
+            [selectedSlot]: { ...prev[selectedSlot], time: currentTime }
+        }));
+    };
+
+    // 슬롯 변경 시 해당 슬롯의 시간 로드 (별도 저장 없음 - 이미 실시간 저장됨)
+    const handleSlotChange = (slot: TimeSlot) => {
         setSelectedSlot(slot);
-        parseTimeToStateOfSlot(updatedSettings[slot].time);
+        parseTimeToStateOfSlot(localSettings[slot].time);
     };
 
     // 알람 On/Off 토글
@@ -98,12 +102,8 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
 
     // 저장
     const handleSave = () => {
-        const currentTime = stateToTimeString(amPm, hour, minute);
-        const finalSettings = {
-            ...localSettings,
-            [selectedSlot]: { ...localSettings[selectedSlot], time: currentTime }
-        };
-        onSave(finalSettings);
+        // 이미 localSettings가 최신 상태이므로 그대로 저장
+        onSave(localSettings);
         onClose();
     };
 
@@ -155,7 +155,7 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
                             <span className="wheel-label">오전/오후</span>
                             <select
                                 value={amPm}
-                                onChange={(e) => setAmPm(e.target.value as '오전' | '오후')}
+                                onChange={(e) => updateTimeSettings(e.target.value as '오전' | '오후', hour, minute)}
                                 className="wheel-select"
                             >
                                 <option value="오전">오전</option>
@@ -167,7 +167,7 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
                             <span className="wheel-label">시</span>
                             <select
                                 value={hour}
-                                onChange={(e) => setHour(Number(e.target.value))}
+                                onChange={(e) => updateTimeSettings(amPm, Number(e.target.value), minute)}
                                 className="wheel-select"
                             >
                                 {hours.map(h => (
@@ -180,7 +180,7 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
                             <span className="wheel-label">분</span>
                             <select
                                 value={minute}
-                                onChange={(e) => setMinute(Number(e.target.value))}
+                                onChange={(e) => updateTimeSettings(amPm, hour, Number(e.target.value))}
                                 className="wheel-select"
                             >
                                 {minutes.map(m => (

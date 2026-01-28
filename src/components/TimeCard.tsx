@@ -73,12 +73,7 @@ export function TimeCard({
                         tabIndex={0}
                         title={isAlarmOn ? '알람 끄기' : '알람 켜기'}
                     >
-                        {(() => {
-                            const [h, m] = alarmTime.split(':').map(Number);
-                            const ampm = h >= 12 ? '오후' : '오전';
-                            const displayH = h % 12 || 12;
-                            return `${ampm} ${displayH}:${String(m).padStart(2, '0')}`;
-                        })()}
+                        {alarmTime}
                     </div>
                 )}
             </div>
