@@ -55,11 +55,20 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
     // 상태를 시간 문자열로 변환 (오전/오후 독립 - 자동 변환 없음)
     const stateToTimeString = (currentAmPm: '오전' | '오후', currentHour: number, currentMinute: number): string => {
         let h = currentHour;
-        if (currentAmPm === '오후' && currentHour !== 12) {
-            h = currentHour + 12;
-        } else if (currentAmPm === '오전' && currentHour === 12) {
-            h = 0;
+
+        // 오후 12시 -> 12시, 오후 1시~11시 -> 13시~23시
+        if (currentAmPm === '오후') {
+            if (currentHour !== 12) {
+                h = currentHour + 12;
+            }
         }
+        // 오전 12시 -> 0시, 오전 1시~11시 -> 1시~11시
+        else {
+            if (currentHour === 12) {
+                h = 0;
+            }
+        }
+
         return `${String(h).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
     };
 
