@@ -56,6 +56,7 @@ export default function MedicineSchedule() {
   const [showConfetti, setShowConfetti] = useState(false);
   const prevAllCheckedRef = useRef(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [initialSlot, setInitialSlot] = useState<TimeSlot>('dawn');
 
   // 알람 상태 관리
   const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean }>>({
@@ -127,20 +128,15 @@ export default function MedicineSchedule() {
     setIsLoaded(true);
   }, []);
 
-  // 알람 토글 핸들러
-  const handleAlarmToggle = useCallback((slot: TimeSlot) => {
-    setAlarmSettings((prev) => {
-      const newSettings = {
-        ...prev,
-        [slot]: { ...prev[slot], isOn: !prev[slot].isOn },
-      };
-      safeSetItem('alarmSettings', JSON.stringify(newSettings));
-      return newSettings;
-    });
+  // 알람 설정 버튼 클릭 (기본값으로 열기)
+  const handleAlarmSettingClick = useCallback(() => {
+    setInitialSlot('dawn');
+    setIsPickerOpen(true);
   }, []);
 
-  // 알람 설정 버튼 클릭
-  const handleAlarmSettingClick = useCallback(() => {
+  // 카드 내 시계 클릭 시 해당 슬롯으로 열기
+  const handleClockClick = useCallback((slot: TimeSlot) => {
+    setInitialSlot(slot);
     setIsPickerOpen(true);
   }, []);
 
@@ -306,7 +302,7 @@ export default function MedicineSchedule() {
               onGroupToggle={() => handleGroupToggle(slot.id)}
               alarmTime={alarmSettings[slot.id].time}
               isAlarmOn={alarmSettings[slot.id].isOn}
-              onAlarmToggle={() => handleAlarmToggle(slot.id)}
+              onAlarmToggle={() => handleClockClick(slot.id)}
             >
               {medicinesBySlot[slot.id].map(renderMedicine)}
             </TimeCard>
@@ -322,6 +318,7 @@ export default function MedicineSchedule() {
         onClose={() => setIsPickerOpen(false)}
         alarmSettings={alarmSettings}
         onSave={handleAlarmSave}
+        initialSlot={initialSlot}
       />
     </>
   );

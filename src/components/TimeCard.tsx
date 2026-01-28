@@ -46,9 +46,8 @@ export function TimeCard({
 
     return (
         <div className="time-card">
-            {/* card-visual에서 onClick 제거 - 아이콘만 클릭 가능 */}
             <div className="card-visual">
-                {/* 아이콘만 클릭 가능 */}
+                {/* 아이콘(picto-box)만 클릭 시 그룹 토글 */}
                 <div
                     className={`picto-box ${allChecked ? 'checked' : ''}`}
                     onClick={handleIconClick}
@@ -65,14 +64,14 @@ export function TimeCard({
                 </div>
                 {/* 라벨은 클릭 불가 */}
                 <div className="visual-time">{label}</div>
-                {/* 시계 - 별도 클릭 이벤트 */}
+                {/* 시계 - 별도 클릭 이벤트 (부모 전파 방지 적용됨) */}
                 {alarmTime && (
                     <div
                         className={`visual-clock ${isAlarmOn ? 'active' : 'off'}`}
                         onClick={handleClockClick}
                         role="button"
                         tabIndex={0}
-                        title={isAlarmOn ? '알림 켜짐 - 클릭하여 끄기' : '알림 꺼짐 - 클릭하여 켜기'}
+                        title={isAlarmOn ? '알림 시간 설정' : '알림 꺼짐 - 클릭하여 설정'}
                     >
                         {alarmTime}
                     </div>

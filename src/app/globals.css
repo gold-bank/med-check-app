@@ -265,7 +265,6 @@ body {
 
 /* 아이콘 클릭 피드백 - 카드가 아닌 picto-box 자체 */
 .picto-box:active {
-  transform: scale(0.92);
   background-color: #e0e0e0;
 }
 
@@ -308,7 +307,7 @@ body {
 }
 
 .visual-clock:active {
-  transform: scale(0.95);
+  opacity: 0.7;
 }
 
 
@@ -697,10 +696,11 @@ body {
   background: #fff;
   border-radius: 12px;
   width: 100%;
-  max-width: 340px;
+  max-width: 320px;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid #333;
 }
 
 .alarm-picker-header {
@@ -799,68 +799,72 @@ body {
   margin-bottom: 12px;
 }
 
+/* 알람 피커 휠 가상 스타일 */
 .picker-wheels {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 10px 0;
 }
 
 .picker-wheel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  flex: 1;
 }
 
 .wheel-label {
-  font-size: 10px;
-  color: #888;
-  font-weight: 600;
+  font-size: 11px;
+  color: #999;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .wheel-select {
-  font-size: 16px;
-  font-weight: 600;
-  padding: 8px 14px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  width: 100%;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 12px 5px;
+  border: 2px solid #eee;
+  border-radius: 10px;
   background: #fff;
   color: #222;
   text-align: center;
   cursor: pointer;
-  min-width: 70px;
   appearance: none;
   -webkit-appearance: none;
+  transition: all 0.2s;
 }
 
 .wheel-select:focus {
   outline: none;
-  border-color: #333;
+  border-color: #222;
+  background: #fcfcfc;
 }
 
 /* 완료 버튼 */
 .alarm-picker-footer {
-  padding: 12px 16px;
-  border-top: 1px solid #e5e5e5;
+  padding: 16px;
+  background: #fff;
 }
 
 .alarm-done-btn {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
   background: #222;
   color: #fff;
   border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 800;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.2s;
 }
 
 .alarm-done-btn:active {
   background: #000;
-}
-
-.alarm-save-btn:active {
   transform: scale(0.98);
 }
