@@ -16,14 +16,14 @@ export default function OneSignalInitializer() {
 
                 await OneSignal.init({
                     appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
-                    // 로컬 테스트 및 다양한 환경 지원
+                    // 로컬 테스트 및 다양한 환경 지원 (http localhost 허용)
                     allowLocalhostAsSecureOrigin: true,
-                    // 알림 권한 요청 슬라이드다운 UI 자동 표시
+                    // 알림 권한 요청 슬라이드다운 UI 자동 표시 설정
                     promptOptions: {
                         slidedown: {
                             prompts: [
                                 {
-                                    type: "push",
+                                    type: "push" as const,
                                     autoPrompt: true,
                                     text: {
                                         actionMessage: "약 복용 시간을 놓치지 않도록 알림을 받아보세요!",
@@ -33,13 +33,13 @@ export default function OneSignalInitializer() {
                                 },
                             ],
                         },
-                    },
+                    } as any,
                 });
 
-                // PWA 등 모바일 환경을 위한 추가 트리거
+                // PWA 및 모바일 환경 호환성을 위해 명시적 호출
                 OneSignal.Slidedown.promptPush();
 
-                console.log('OneSignal Initialized Successfully');
+                console.log('OneSignal Initialized Successfully (v16)');
             } catch (error) {
                 console.error('OneSignal Init Error:', error);
             }
