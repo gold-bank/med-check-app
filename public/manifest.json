@@ -1,6 +1,6 @@
 {
     "name": "약복용 스케줄",
-    "short_name": "약복용",
+    "short_name": "약복용 스케줄",
     "description": "매일 복용 기록하기",
     "start_url": "/",
     "display": "standalone",
