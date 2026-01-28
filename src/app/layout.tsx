@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import OneSignalInitializer from "@/components/OneSignalInitializer";
+import OneSignalInitializer from '@/components/OneSignalInitializer';
 
 export const metadata: Metadata = {
   title: "약복용 스케줄",
