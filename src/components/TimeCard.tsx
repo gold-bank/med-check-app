@@ -64,14 +64,14 @@ export function TimeCard({
                 </div>
                 {/* 라벨은 클릭 불가 */}
                 <div className="visual-time">{label}</div>
-                {/* 시계 - 별도 클릭 이벤트 (부모 전파 방지 적용됨) */}
+                {/* 시계 - 단순 On/Off 토글 (부모 전파 방지) */}
                 {alarmTime && (
                     <div
                         className={`visual-clock ${isAlarmOn ? 'active' : 'off'}`}
                         onClick={handleClockClick}
                         role="button"
                         tabIndex={0}
-                        title={isAlarmOn ? '알림 시간 설정' : '알림 꺼짐 - 클릭하여 설정'}
+                        title={isAlarmOn ? '알람 끄기' : '알람 켜기'}
                     >
                         {alarmTime}
                     </div>

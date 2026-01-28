@@ -134,10 +134,16 @@ export default function MedicineSchedule() {
     setIsPickerOpen(true);
   }, []);
 
-  // 카드 내 시계 클릭 시 해당 슬롯으로 열기
-  const handleClockClick = useCallback((slot: TimeSlot) => {
-    setInitialSlot(slot);
-    setIsPickerOpen(true);
+  // 카드 내 시계 클릭 시 알람 간편 토글 (팝업 없음)
+  const handleClockToggle = useCallback((slot: TimeSlot) => {
+    setAlarmSettings((prev) => {
+      const newSettings = {
+        ...prev,
+        [slot]: { ...prev[slot], isOn: !prev[slot].isOn },
+      };
+      safeSetItem('alarmSettings', JSON.stringify(newSettings));
+      return newSettings;
+    });
   }, []);
 
   // 알람 설정 저장
@@ -302,7 +308,7 @@ export default function MedicineSchedule() {
               onGroupToggle={() => handleGroupToggle(slot.id)}
               alarmTime={alarmSettings[slot.id].time}
               isAlarmOn={alarmSettings[slot.id].isOn}
-              onAlarmToggle={() => handleClockClick(slot.id)}
+              onAlarmToggle={() => handleClockToggle(slot.id)}
             >
               {medicinesBySlot[slot.id].map(renderMedicine)}
             </TimeCard>
