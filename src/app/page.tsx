@@ -9,6 +9,7 @@ import { Confetti } from '@/components/Confetti';
 import { AlarmPicker } from '@/components/AlarmPicker';
 import { safeGetItem, safeSetItem, safeClear } from '@/lib/storage';
 import { BASE_MEDICINES, TIME_SLOTS, type TimeSlot, type Medicine } from '@/lib/medicines';
+import OneSignal from 'react-onesignal';
 
 // 알림 시간 기본값
 const DEFAULT_ALARM_TIMES: Record<TimeSlot, string> = {
@@ -50,6 +51,20 @@ function calculateMTXStatus(targetDay: number): { isActive: boolean; badge: stri
   return { isActive: false, badge: `D-${diff}` };
 }
 
+// 알람 계산 (오늘 또는 내일의 해당 시간)
+const getNextAlarmDate = (timeStr: string): string => {
+  const [hour, minute] = timeStr.split(':').map(Number);
+  const now = new Date();
+  const scheduled = new Date();
+  scheduled.setHours(hour, minute, 0, 0);
+
+  // 이미 시간이 지났으면 내일로 설정
+  if (scheduled <= now) {
+    scheduled.setDate(scheduled.getDate() + 1);
+  }
+  return scheduled.toISOString();
+};
+
 export default function MedicineSchedule() {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [isLoaded, setIsLoaded] = useState(false);
@@ -59,7 +74,7 @@ export default function MedicineSchedule() {
   const [initialSlot, setInitialSlot] = useState<TimeSlot>('dawn');
 
   // 알람 상태 관리
-  const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean }>>({
+  const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean; notificationId?: string }>>({
     dawn: { time: DEFAULT_ALARM_TIMES.dawn, isOn: false },
     morning: { time: DEFAULT_ALARM_TIMES.morning, isOn: false },
     noon: { time: DEFAULT_ALARM_TIMES.noon, isOn: false },
@@ -134,17 +149,71 @@ export default function MedicineSchedule() {
     setIsPickerOpen(true);
   }, []);
 
-  // 카드 내 시계 클릭 시 알람 간편 토글 (팝업 없음)
-  const handleClockToggle = useCallback((slot: TimeSlot) => {
+  // 카드 내 시계 클릭 시 알람 간편 토글 (API 연동)
+  const handleClockToggle = useCallback(async (slot: TimeSlot) => {
+    const currentSetting = alarmSettings[slot];
+    const newIsOn = !currentSetting.isOn;
+
+    // 낙관적 업데이트 (UI 먼저 반영)
     setAlarmSettings((prev) => {
       const newSettings = {
         ...prev,
-        [slot]: { ...prev[slot], isOn: !prev[slot].isOn },
+        [slot]: { ...prev[slot], isOn: newIsOn },
       };
       safeSetItem('alarmSettings', JSON.stringify(newSettings));
       return newSettings;
     });
-  }, []);
+
+    try {
+      // OneSignal Player ID 가져오기
+      let playerId = '';
+      if (typeof window !== 'undefined' && window.OneSignal) {
+        playerId = await OneSignal.User.PushSubscription.id || '';
+        if (!playerId) {
+          console.warn('OneSignal Player ID not found. User might not be subscribed.');
+        }
+      }
+
+      const scheduleTime = getNextAlarmDate(currentSetting.time);
+
+      const response = await fetch('/api/schedule-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: newIsOn ? 'schedule' : 'cancel',
+          playerId,
+          time: scheduleTime,
+          slotId: slot,
+          heading: `${currentSetting.time} 약 복용 알림`,
+          content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
+          notificationId: currentSetting.notificationId, // 취소 시 필요
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // 성공 시 notificationId 업데이트 (ON일 때 생성된 ID 저장, OFF일 때 제거)
+        setAlarmSettings((prev) => {
+          const updated = {
+            ...prev,
+            [slot]: {
+              ...prev[slot],
+              isOn: newIsOn, // 서버 응답에 따라 확실하게 설정
+              notificationId: newIsOn ? result.notificationId : undefined
+            },
+          };
+          safeSetItem('alarmSettings', JSON.stringify(updated));
+          return updated;
+        });
+        console.log(`알람 ${newIsOn ? '예약' : '취소'} 성공:`, result);
+      } else {
+        console.error('알람 API 처리 실패:', result);
+      }
+    } catch (error) {
+      console.error('알람 토글 중 오류 발생:', error);
+    }
+  }, [alarmSettings]);
 
   // 알람 설정 저장
   const handleAlarmSave = useCallback((newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {
