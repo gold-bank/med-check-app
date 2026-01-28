@@ -33,7 +33,6 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
     useEffect(() => {
         if (isOpen) {
             setLocalSettings(alarmSettings);
-            // 첫 번째 슬롯의 시간으로 초기화
             parseTimeToState(alarmSettings.dawn.time);
         }
     }, [isOpen, alarmSettings]);
@@ -51,7 +50,7 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
         setMinute(m);
     };
 
-    // 상태를 시간 문자열로 변환
+    // 상태를 시간 문자열로 변환 (오전/오후 독립 - 자동 변환 없음)
     const stateToTimeString = (): string => {
         let h = hour;
         if (amPm === '오후' && hour !== 12) {
@@ -77,7 +76,8 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
     };
 
     // 알람 On/Off 토글
-    const handleToggle = (slot: TimeSlot) => {
+    const handleToggle = (slot: TimeSlot, e: React.MouseEvent) => {
+        e.stopPropagation();
         setLocalSettings(prev => ({
             ...prev,
             [slot]: { ...prev[slot], isOn: !prev[slot].isOn }
@@ -86,7 +86,6 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
 
     // 저장
     const handleSave = () => {
-        // 현재 편집 중인 슬롯 시간도 저장
         const currentTime = stateToTimeString();
         const finalSettings = {
             ...localSettings,
@@ -104,6 +103,7 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
     return (
         <div className="alarm-picker-overlay" onClick={onClose}>
             <div className="alarm-picker-modal" onClick={(e) => e.stopPropagation()}>
+                {/* 헤더 */}
                 <div className="alarm-picker-header">
                     <h3>알림 시간 설정</h3>
                     <button className="alarm-picker-close" onClick={onClose}>
@@ -111,50 +111,50 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
                     </button>
                 </div>
 
-                {/* 그룹 선택 */}
+                {/* 그룹 선택 목록 */}
                 <div className="alarm-picker-slots">
                     {TIME_SLOTS.map((slot) => (
-                        <button
+                        <div
                             key={slot.id}
-                            className={`alarm-slot-btn ${selectedSlot === slot.id ? 'active' : ''} ${localSettings[slot.id].isOn ? 'on' : 'off'}`}
+                            className={`alarm-slot-row ${selectedSlot === slot.id ? 'active' : ''}`}
                             onClick={() => handleSlotChange(slot.id)}
                         >
-                            <span className="slot-label">{SLOT_LABELS[slot.id]}</span>
-                            <span className="slot-time">{localSettings[slot.id].time}</span>
+                            <span className="slot-name">{SLOT_LABELS[slot.id]}</span>
+                            <span className="slot-time-display">{localSettings[slot.id].time}</span>
                             <button
-                                className={`slot-toggle ${localSettings[slot.id].isOn ? 'on' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); handleToggle(slot.id); }}
+                                className={`slot-switch ${localSettings[slot.id].isOn ? 'on' : ''}`}
+                                onClick={(e) => handleToggle(slot.id, e)}
                             >
                                 {localSettings[slot.id].isOn ? 'ON' : 'OFF'}
                             </button>
-                        </button>
+                        </div>
                     ))}
                 </div>
 
-                {/* 시간 피커 */}
+                {/* 시간 피커 - 독립 휠 */}
                 <div className="alarm-picker-time">
-                    <div className="picker-label">시간 선택: {SLOT_LABELS[selectedSlot]}</div>
+                    <div className="picker-title">{SLOT_LABELS[selectedSlot]} 시간 설정</div>
                     <div className="picker-wheels">
-                        {/* 오전/오후 */}
-                        <div className="picker-column">
-                            <div className="picker-column-label">오전/오후</div>
+                        {/* 오전/오후 - 독립 제어 */}
+                        <div className="picker-wheel">
+                            <label className="wheel-label">오전/오후</label>
                             <select
                                 value={amPm}
                                 onChange={(e) => setAmPm(e.target.value as '오전' | '오후')}
-                                className="picker-select"
+                                className="wheel-select"
                             >
                                 <option value="오전">오전</option>
                                 <option value="오후">오후</option>
                             </select>
                         </div>
 
-                        {/* 시 */}
-                        <div className="picker-column">
-                            <div className="picker-column-label">시</div>
+                        {/* 시 - 독립 제어 (오전/오후 변경 안 됨) */}
+                        <div className="picker-wheel">
+                            <label className="wheel-label">시</label>
                             <select
                                 value={hour}
                                 onChange={(e) => setHour(Number(e.target.value))}
-                                className="picker-select"
+                                className="wheel-select"
                             >
                                 {hours.map(h => (
                                     <option key={h} value={h}>{h}</option>
@@ -163,12 +163,12 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
                         </div>
 
                         {/* 분 */}
-                        <div className="picker-column">
-                            <div className="picker-column-label">분</div>
+                        <div className="picker-wheel">
+                            <label className="wheel-label">분</label>
                             <select
                                 value={minute}
                                 onChange={(e) => setMinute(Number(e.target.value))}
-                                className="picker-select"
+                                className="wheel-select"
                             >
                                 {minutes.map(m => (
                                     <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
@@ -178,10 +178,10 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave }: AlarmPic
                     </div>
                 </div>
 
-                {/* 저장 버튼 */}
-                <div className="alarm-picker-actions">
-                    <button className="alarm-save-btn" onClick={handleSave}>
-                        저장하기
+                {/* 완료 버튼 */}
+                <div className="alarm-picker-footer">
+                    <button className="alarm-done-btn" onClick={handleSave}>
+                        완료
                     </button>
                 </div>
             </div>

@@ -30,8 +30,15 @@ export function TimeCard({
     isAlarmOn = false,
     onAlarmToggle,
 }: TimeCardProps) {
+    // 아이콘(picto-box)만 클릭 시 그룹 토글
+    const handleIconClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onGroupToggle();
+    };
+
+    // 시계 클릭 시 알람 토글 (부모 이벤트 차단)
     const handleClockClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // 그룹 토글 방지
+        e.stopPropagation();
         if (onAlarmToggle) {
             onAlarmToggle();
         }
@@ -39,26 +46,32 @@ export function TimeCard({
 
     return (
         <div className="time-card">
-            <div
-                className="card-visual"
-                onClick={onGroupToggle}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onGroupToggle();
-                    }
-                }}
-            >
-                <div className={`picto-box ${allChecked ? 'checked' : ''}`}>
+            {/* card-visual에서 onClick 제거 - 아이콘만 클릭 가능 */}
+            <div className="card-visual">
+                {/* 아이콘만 클릭 가능 */}
+                <div
+                    className={`picto-box ${allChecked ? 'checked' : ''}`}
+                    onClick={handleIconClick}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onGroupToggle();
+                        }
+                    }}
+                >
                     <Icon name={iconName as IconName} />
                 </div>
+                {/* 라벨은 클릭 불가 */}
                 <div className="visual-time">{label}</div>
+                {/* 시계 - 별도 클릭 이벤트 */}
                 {alarmTime && (
                     <div
                         className={`visual-clock ${isAlarmOn ? 'active' : 'off'}`}
                         onClick={handleClockClick}
+                        role="button"
+                        tabIndex={0}
                         title={isAlarmOn ? '알림 켜짐 - 클릭하여 끄기' : '알림 꺼짐 - 클릭하여 켜기'}
                     >
                         {alarmTime}

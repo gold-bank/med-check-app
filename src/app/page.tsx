@@ -55,7 +55,7 @@ export default function MedicineSchedule() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const prevAllCheckedRef = useRef(false);
-  const [isAlarmPickerOpen, setIsAlarmPickerOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   // 알람 상태 관리
   const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean }>>({
@@ -141,7 +141,7 @@ export default function MedicineSchedule() {
 
   // 알람 설정 버튼 클릭
   const handleAlarmSettingClick = useCallback(() => {
-    setIsAlarmPickerOpen(true);
+    setIsPickerOpen(true);
   }, []);
 
   // 알람 설정 저장
@@ -318,8 +318,8 @@ export default function MedicineSchedule() {
 
       {/* 알람 피커 모달 */}
       <AlarmPicker
-        isOpen={isAlarmPickerOpen}
-        onClose={() => setIsAlarmPickerOpen(false)}
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
         alarmSettings={alarmSettings}
         onSave={handleAlarmSave}
       />
