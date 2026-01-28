@@ -1,20 +1,52 @@
-"use client";
+'use client';
+
 import { useEffect } from 'react';
 import OneSignal from 'react-onesignal';
 
 export default function OneSignalInitializer() {
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        // 서버 사이드 렌더링 시 실행 방지
+        if (typeof window === 'undefined') return;
+
+        const runOneSignal = async () => {
             try {
-                // Init with strict security off for dev testing
-                OneSignal.init({
-                    appId: "3f3049b0-07a6-43ba-a2ca-959840f3c546",
+                // 중복 실행 방지
+                // @ts-ignore
+                if (window.OneSignal && window.OneSignal.initialized) return;
+
+                await OneSignal.init({
+                    appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
+                    // 로컬 테스트 및 다양한 환경 지원
                     allowLocalhostAsSecureOrigin: true,
+                    // 알림 권한 요청 슬라이드다운 UI 자동 표시
+                    promptOptions: {
+                        slidedown: {
+                            prompts: [
+                                {
+                                    type: "push",
+                                    autoPrompt: true,
+                                    text: {
+                                        actionMessage: "약 복용 시간을 놓치지 않도록 알림을 받아보세요!",
+                                        acceptButton: "알림 켜기",
+                                        cancelButton: "나중에",
+                                    },
+                                },
+                            ],
+                        },
+                    },
                 });
+
+                // PWA 등 모바일 환경을 위한 추가 트리거
+                OneSignal.Slidedown.promptPush();
+
+                console.log('OneSignal Initialized Successfully');
             } catch (error) {
-                console.error("OneSignal init error:", error);
+                console.error('OneSignal Init Error:', error);
             }
-        }
+        };
+
+        runOneSignal();
     }, []);
-    return null;
+
+    return null; // 화면에 아무것도 그리지 않음
 }
