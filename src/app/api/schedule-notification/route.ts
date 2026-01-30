@@ -111,8 +111,11 @@ export async function POST(request: Request) {
         // 4. 알림 취소 (Cancel)
         else if (action === 'cancel') {
             console.log(`[Cancel] Request to delete Msg ID: ${notificationId}`);
+
+            // ID가 없어도 에러 처리하지 않고 성공으로 간주 (방어적 코드)
             if (!notificationId) {
-                return NextResponse.json({ error: 'Missing notificationId' }, { status: 400 });
+                console.log('[Cancel] No notificationId provided. Skipping QStash deletion, but returning success.');
+                return NextResponse.json({ success: true, message: 'No ID to cancel, skipping' });
             }
 
             try {
@@ -120,7 +123,8 @@ export async function POST(request: Request) {
                 console.log('[Cancel] QStash Message deleted successfully:', notificationId);
                 return NextResponse.json({ success: true });
             } catch (e: any) {
-                console.warn('[Cancel] Failed to delete QStash message (might be already sent):', e.message);
+                // 이미 삭제되었거나 존재하지 않는 경우도 성공으로 처리
+                console.warn('[Cancel] Failed to delete QStash message (might be already sent/deleted):', e.message);
                 return NextResponse.json({ success: true, warning: 'Message not found or already executed' });
             }
         }

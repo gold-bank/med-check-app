@@ -136,9 +136,21 @@ export default function MedicineSchedule() {
     if (savedAlarms) {
       try {
         const parsed = JSON.parse(savedAlarms);
-        setAlarmSettings(parsed);
+
+        // 데이터 검증: 필수 키(time, isOn)가 있는지 확인
+        const isValid = Object.values(parsed).every((item: any) =>
+          typeof item === 'object' && 'time' in item && 'isOn' in item
+        );
+
+        if (isValid) {
+          setAlarmSettings(parsed);
+        } else {
+          console.warn('저장된 알람 설정 형식이 올바르지 않아 초기화합니다.');
+          safeClear(); // 혹시 모를 꼬임 방지
+        }
       } catch (e) {
-        console.error('알람 설정 로드 실패:', e);
+        console.error('알람 설정 로드 실패 (초기화):', e);
+        // 파싱 에러 시 무시하고 기본값 사용
       }
     }
 
@@ -185,6 +197,8 @@ export default function MedicineSchedule() {
 
       const scheduleTime = getNextAlarmDate(currentSetting.time);
 
+      // (방어적 코드) 취소 시 notificationId가 없어도 API 호출을 진행하여 서버에서 처리하도록 함
+
       const payload = {
         action: newIsOn ? 'schedule' : 'cancel',
         token: fcmToken,
@@ -192,7 +206,7 @@ export default function MedicineSchedule() {
         slotId: slot,
         heading: `${currentSetting.time} 약 복용 알림`,
         content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
-        notificationId: currentSetting.notificationId,
+        notificationId: currentSetting.notificationId || '', // 없는 경우 빈 문자열 전송
       };
 
       console.log("[Frontend] Sending payload:", payload);
