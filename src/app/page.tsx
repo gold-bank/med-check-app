@@ -9,7 +9,8 @@ import { Confetti } from '@/components/Confetti';
 import { AlarmPicker } from '@/components/AlarmPicker';
 import { safeGetItem, safeSetItem, safeClear } from '@/lib/storage';
 import { BASE_MEDICINES, TIME_SLOTS, type TimeSlot, type Medicine } from '@/lib/medicines';
-import OneSignal from 'react-onesignal';
+import useFcmToken from '@/hooks/useFcmToken';
+
 
 // 알림 시간 기본값
 const DEFAULT_ALARM_TIMES: Record<TimeSlot, string> = {
@@ -72,6 +73,7 @@ export default function MedicineSchedule() {
   const prevAllCheckedRef = useRef(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<TimeSlot>('dawn');
+  const { fcmToken } = useFcmToken();
 
   // 알람 상태 관리
   const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean; notificationId?: string }>>({
@@ -165,13 +167,9 @@ export default function MedicineSchedule() {
     });
 
     try {
-      // OneSignal Player ID 가져오기
-      let playerId = '';
-      if (typeof window !== 'undefined' && window.OneSignal) {
-        playerId = await OneSignal.User.PushSubscription.id || '';
-        if (!playerId) {
-          console.warn('OneSignal Player ID not found. User might not be subscribed.');
-        }
+      if (!fcmToken && newIsOn) {
+        console.warn('알림 권한이 없거나 토큰 발급 실패');
+        // 필요한 경우 권한 요청 로직 추가 또는 사용자 알림
       }
 
       const scheduleTime = getNextAlarmDate(currentSetting.time);
@@ -181,7 +179,7 @@ export default function MedicineSchedule() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: newIsOn ? 'schedule' : 'cancel',
-          playerId,
+          token: fcmToken,
           time: scheduleTime,
           slotId: slot,
           heading: `${currentSetting.time} 약 복용 알림`,
@@ -219,7 +217,7 @@ export default function MedicineSchedule() {
   const handleAlarmSave = useCallback((newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {
     setAlarmSettings(newSettings);
     safeSetItem('alarmSettings', JSON.stringify(newSettings));
-    // TODO: OneSignal 예약 API 연동
+
     console.log('알람 설정 저장됨:', newSettings);
   }, []);
 

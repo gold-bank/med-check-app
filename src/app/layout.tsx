@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import OneSignalInitializer from '@/components/OneSignalInitializer';
+
 
 export const metadata: Metadata = {
   title: "약복용 스케줄",
@@ -50,7 +50,7 @@ export default function RootLayout({
         <meta httpEquiv="Expires" content="0" />
       </head>
       <body>
-        <OneSignalInitializer />
+
         {children}
       </body>
     </html>

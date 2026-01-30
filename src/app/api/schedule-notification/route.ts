@@ -1,94 +1,113 @@
-
 import { NextResponse } from 'next/server';
+import admin from 'firebase-admin';
+import { Client } from "@upstash/qstash";
 
-const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1/notifications';
+// FCM Init
+if (!admin.apps.length) {
+    try {
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+            }),
+        });
+        console.log('Firebase Admin Initialized.');
+    } catch (error) {
+        console.error('Firebase Admin Init Failed:', error);
+    }
+}
+
+// QStash Init
+const qstashClient = new Client({
+    token: process.env.QSTASH_TOKEN || '',
+});
 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { action, playerId, time, slotId, heading, content, notificationId } = body;
+        const { action, token, time, heading, content, notificationId } = body;
 
-        const apiKey = process.env.ONESIGNAL_REST_API_KEY;
-        const appId = process.env.ONESIGNAL_APP_ID;
-
-        if (!apiKey || !appId) {
-            return NextResponse.json({ error: 'Missing OneSignal credentials' }, { status: 500 });
-        }
-
+        // 1. 알림 예약 (Schedule)
         if (action === 'schedule') {
-            if (!playerId || !time) {
-                return NextResponse.json({ error: 'Missing playerId or time' }, { status: 400 });
+            if (!token || !time) {
+                return NextResponse.json({ error: 'Missing token or time' }, { status: 400 });
             }
 
-            // 알람 예약 (Create Notification)
-            // time 포맷: ISO String 또는 그에 준하는 포맷
-            const response = await fetch(ONESIGNAL_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Basic ${apiKey}`,
+            const scheduledDate = new Date(time);
+            const now = new Date();
+            // 초 단위 delay 계산 (최소 0초)
+            const delay = Math.max(0, Math.floor((scheduledDate.getTime() - now.getTime()) / 1000));
+
+            console.log(`[Schedule] Time: ${time}, Delay: ${delay}s`);
+
+            // Upstash에 메시지 예약 발행
+            // 예약된 시간이 되면 QStash가 이 API를 'execute-send' 액션으로 다시 호출함
+            const result = await qstashClient.publishJSON({
+                url: `${process.env.APP_URL}/api/schedule-notification`,
+                body: {
+                    action: 'execute-send',
+                    token,
+                    heading,
+                    content
                 },
-                body: JSON.stringify({
-                    app_id: appId,
-                    include_player_ids: [playerId], // 특정 사용자(기기)에게만 전송
-                    headings: { en: heading || 'Medication Reminder', ko: heading || '약 복용 시간입니다!' },
-                    contents: { en: content || 'It is time to take your medicine.', ko: content || '잊지 말고 약을 챙겨드세요.' },
-                    send_after: time, // 예약 시간 (UTC ISO String 권장)
-                    // 안드로이드/iOS 관련 설정 (필요 시 추가)
-                    ios_sound: 'default',
-                    android_sound: 'notification',
-                }),
+                delay: delay,
             });
 
-            const data = await response.json();
+            // Upstash Message ID를 반환 (취소 시 사용)
+            return NextResponse.json({ success: true, notificationId: result.messageId });
+        }
 
-            if (data.id) {
-                return NextResponse.json({ success: true, notificationId: data.id });
-            } else {
-                return NextResponse.json({ success: false, error: data }, { status: 400 });
-            }
+        // 2. 알림 실행 (Execute Send - Called by QStash)
+        else if (action === 'execute-send') {
+            console.log('[Execute] Sending actual FCM notification...');
 
-        } else if (action === 'cancel') {
+            const message = {
+                token: token,
+                notification: {
+                    title: heading || 'Medication Check',
+                    body: content || 'Time to take your medicine!',
+                },
+                android: {
+                    notification: {
+                        clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                        channelId: 'med_check_channel',
+                    }
+                },
+                webpush: {
+                    notification: {
+                        icon: '/pill-icon.png',
+                        badge: '/pill-icon.png',
+                    }
+                }
+            };
+
+            const response = await admin.messaging().send(message);
+            console.log('[Execute] FCM Sent:', response);
+            return NextResponse.json({ success: true, messageId: response });
+        }
+
+        // 3. 알림 취소 (Cancel)
+        else if (action === 'cancel') {
             if (!notificationId) {
                 return NextResponse.json({ error: 'Missing notificationId' }, { status: 400 });
             }
 
-            // 예약 취소 (Cancel Notification)
-            const cancelUrl = `${ONESIGNAL_API_URL}/${notificationId}?app_id=${appId}`;
-            const response = await fetch(cancelUrl, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Basic ${apiKey}`,
-                }
-            });
-
-            const data = await response.json();
-
-            // OneSignal DELETE response format might vary, but usually returns success: true
-            if (data.success) {
+            try {
+                await qstashClient.messages.delete(notificationId);
+                console.log('[Cancel] QStash Message deleted:', notificationId);
                 return NextResponse.json({ success: true });
-            } else {
-                // 이미 전송되었거나 존재하지 않는 경우 등
-                console.warn('Cancel failed or not found:', data);
-                // 클라이언트 입장에서는 '취소됨'으로 처리해도 무방함
-                return NextResponse.json({ success: true, warning: 'Notification not found or already sent' });
+            } catch (e) {
+                console.error('[Cancel] Failed to delete QStash message:', e);
+                // 이미 실행되었거나 없는 경우도 성공으로 처리
+                return NextResponse.json({ success: true, warning: 'Message not found or already executed' });
             }
         }
 
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
     } catch (error: any) {
-        console.error('API Error Details:', {
-            message: error.message,
-            stack: error.stack,
-            envCheck: {
-                hasApiKey: !!process.env.ONESIGNAL_REST_API_KEY,
-                hasAppId: !!process.env.ONESIGNAL_APP_ID
-            }
-        });
-        return NextResponse.json({
-            error: 'Internal Server Error',
-            details: error.message
-        }, { status: 500 });
+        console.error('API Error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
