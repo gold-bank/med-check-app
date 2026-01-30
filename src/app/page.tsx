@@ -204,12 +204,12 @@ export default function MedicineSchedule() {
           safeSetItem('alarmSettings', JSON.stringify(updated));
           return updated;
         });
-        console.log(`알람 ${newIsOn ? '예약' : '취소'} 성공:`, result);
+        console.log(`[Frontend] 알림 ${newIsOn ? '예약' : '취소'} 성공. Noti ID:`, result.notificationId);
       } else {
-        console.error('알람 API 처리 실패:', result);
+        console.error('[Frontend Error] 알람 API 처리 실패. 응답:', result);
       }
     } catch (error) {
-      console.error('알람 토글 중 오류 발생:', error);
+      console.error('[Frontend Critical Error] 알람 토글 중 fetch 오류 발생:', error);
     }
   }, [alarmSettings]);
 
