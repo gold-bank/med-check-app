@@ -167,25 +167,40 @@ export default function MedicineSchedule() {
     });
 
     try {
+      // FCM 토큰 검증
       if (!fcmToken && newIsOn) {
-        console.warn('알림 권한이 없거나 토큰 발급 실패');
-        // 필요한 경우 권한 요청 로직 추가 또는 사용자 알림
+        // 토큰 없는데 켜려고 하면 경고 후 원상복구
+        alert('알림 서비스를 이용하려면 권한 허용이 필요합니다. 잠시 후 다시 시도해주세요.');
+
+        setAlarmSettings((prev) => {
+          const reverted = {
+            ...prev,
+            [slot]: { ...prev[slot], isOn: !newIsOn }
+          };
+          safeSetItem('alarmSettings', JSON.stringify(reverted));
+          return reverted;
+        });
+        return;
       }
 
       const scheduleTime = getNextAlarmDate(currentSetting.time);
 
+      const payload = {
+        action: newIsOn ? 'schedule' : 'cancel',
+        token: fcmToken,
+        time: scheduleTime,
+        slotId: slot,
+        heading: `${currentSetting.time} 약 복용 알림`,
+        content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
+        notificationId: currentSetting.notificationId,
+      };
+
+      console.log("[Frontend] Sending payload:", payload);
+
       const response = await fetch('/api/schedule-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: newIsOn ? 'schedule' : 'cancel',
-          token: fcmToken,
-          time: scheduleTime,
-          slotId: slot,
-          heading: `${currentSetting.time} 약 복용 알림`,
-          content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
-          notificationId: currentSetting.notificationId, // 취소 시 필요
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -207,11 +222,32 @@ export default function MedicineSchedule() {
         console.log(`[Frontend] 알림 ${newIsOn ? '예약' : '취소'} 성공. Noti ID:`, result.notificationId);
       } else {
         console.error('[Frontend Error] 알람 API 처리 실패. 응답:', result);
+
+        // API 실패 시 UI 원복
+        setAlarmSettings((prev) => {
+          const reverted = {
+            ...prev,
+            [slot]: { ...prev[slot], isOn: !newIsOn }
+          };
+          safeSetItem('alarmSettings', JSON.stringify(reverted));
+          return reverted;
+        });
+        alert('알림 설정에 실패했습니다. (API Error)');
       }
     } catch (error) {
       console.error('[Frontend Critical Error] 알람 토글 중 fetch 오류 발생:', error);
+      // 에러 발생 시 UI 원복
+      setAlarmSettings((prev) => {
+        const reverted = {
+          ...prev,
+          [slot]: { ...prev[slot], isOn: !newIsOn }
+        };
+        safeSetItem('alarmSettings', JSON.stringify(reverted));
+        return reverted;
+      });
+      alert('네트워크 오류가 발생했습니다.');
     }
-  }, [alarmSettings]);
+  }, [alarmSettings, fcmToken]);
 
   // 알람 설정 저장
   const handleAlarmSave = useCallback((newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {
