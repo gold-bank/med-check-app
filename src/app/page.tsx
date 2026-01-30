@@ -52,19 +52,7 @@ function calculateMTXStatus(targetDay: number): { isActive: boolean; badge: stri
   return { isActive: false, badge: `D-${diff}` };
 }
 
-// 알람 계산 (오늘 또는 내일의 해당 시간)
-const getNextAlarmDate = (timeStr: string): string => {
-  const [hour, minute] = timeStr.split(':').map(Number);
-  const now = new Date();
-  const scheduled = new Date();
-  scheduled.setHours(hour, minute, 0, 0);
-
-  // 이미 시간이 지났으면 내일로 설정
-  if (scheduled <= now) {
-    scheduled.setDate(scheduled.getDate() + 1);
-  }
-  return scheduled.toISOString();
-};
+// (서버에서 시간 계산을 수행하므로 getNextAlarmDate 함수는 더 이상 프론트엔드에서 사용하지 않음)
 
 export default function MedicineSchedule() {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
@@ -74,6 +62,7 @@ export default function MedicineSchedule() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<TimeSlot>('dawn');
   const { fcmToken } = useFcmToken();
+  const [processingSlots, setProcessingSlots] = useState<Set<string>>(new Set());
 
   // 알람 상태 관리
   const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean; notificationId?: string }>>({
@@ -165,8 +154,31 @@ export default function MedicineSchedule() {
 
   // 카드 내 시계 클릭 시 알람 간편 토글 (API 연동)
   const handleClockToggle = useCallback(async (slot: TimeSlot) => {
+    // 이미 처리 중이면 중복 실행 방지
+    if (processingSlots.has(slot)) {
+      console.warn(`[Frontend] Slot ${slot} is already processing. Ignoring click.`);
+      return;
+    }
+
     const currentSetting = alarmSettings[slot];
     const newIsOn = !currentSetting.isOn;
+
+    // 알람을 끄려고 하는데 ID가 없다? -> 서버 예약 자체가 안 된 상태이므로 UI만 끄고 종료
+    if (!newIsOn && !currentSetting.notificationId) {
+      console.log('[Frontend] 취소할 알림 ID가 없어 API 호출 없이 UI만 끔.');
+      setAlarmSettings((prev) => {
+        const updated = {
+          ...prev,
+          [slot]: { ...prev[slot], isOn: false, notificationId: undefined },
+        };
+        safeSetItem('alarmSettings', JSON.stringify(updated));
+        return updated;
+      });
+      return;
+    }
+
+    // 처리 상태 시작
+    setProcessingSlots((prev) => new Set(prev).add(slot));
 
     // 낙관적 업데이트 (UI 먼저 반영)
     setAlarmSettings((prev) => {
@@ -195,21 +207,20 @@ export default function MedicineSchedule() {
         return;
       }
 
-      const scheduleTime = getNextAlarmDate(currentSetting.time);
-
       // (방어적 코드) 취소 시 notificationId가 없어도 API 호출을 진행하여 서버에서 처리하도록 함
 
+      // 서버에서 기준 시간(KST)으로 정확히 계산하도록 원본 시간 문자열("HH:mm") 전송
       const payload = {
         action: newIsOn ? 'schedule' : 'cancel',
         token: fcmToken,
-        time: scheduleTime,
+        time: currentSetting.time, // "HH:mm" 예: "07:00"
         slotId: slot,
         heading: `${currentSetting.time} 약 복용 알림`,
         content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
         notificationId: currentSetting.notificationId || '', // 없는 경우 빈 문자열 전송
       };
 
-      console.log("[Frontend] Sending payload:", payload);
+      console.log("[Frontend] Sending payload (Raw Time):", payload);
 
       const response = await fetch('/api/schedule-notification', {
         method: 'POST',
@@ -260,8 +271,15 @@ export default function MedicineSchedule() {
         return reverted;
       });
       alert('네트워크 오류가 발생했습니다.');
+    } finally {
+      // 처리 상태 해제
+      setProcessingSlots((prev) => {
+        const next = new Set(prev);
+        next.delete(slot);
+        return next;
+      });
     }
-  }, [alarmSettings, fcmToken]);
+  }, [alarmSettings, fcmToken, processingSlots]);
 
   // 알람 설정 저장
   const handleAlarmSave = useCallback((newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {

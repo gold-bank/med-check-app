@@ -45,21 +45,38 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Missing token or time' }, { status: 400 });
             }
 
-            // 시간 계산 (KST 고려 불필요 - Date 객체 차이는 UTC 기반으로 자동 계산됨)
-            // 단, 클라이언트가 보낸 time이 어떤 타임존인지가 중요함 (ISO String 권장)
-            const scheduledDate = new Date(time);
+            // --- KST 시간 계산 (서버 시간 기반) ---
+            // 1. 현재 한국 시간 구하기 (UTC + 9시간)
             const now = new Date();
-            const diffMs = scheduledDate.getTime() - now.getTime();
+            const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
 
-            // 초 단위 delay 계산 (최소 0초)
-            const delay = Math.max(0, Math.floor(diffMs / 1000));
+            // 2. 목표 시간 파싱 ("HH:mm")
+            const [targetHour, targetMinute] = time.split(':').map(Number);
 
-            console.log(`[Schedule Check] Scheduled: ${scheduledDate.toISOString()}, Now: ${now.toISOString()}`);
-            console.log(`[Schedule Check] Diff(ms): ${diffMs}, Delay(s): ${delay}`);
+            // 3. 목표 한국 시간 객체 생성
+            const kstTarget = new Date(kstNow);
+            kstTarget.setHours(targetHour, targetMinute, 0, 0);
 
-            if (delay <= 0) {
-                console.warn('[Schedule Warning] Scheduled time is in the past. Sending immediately or setting short delay.');
+            // 4. 이미 지났으면 내일로 설정
+            if (kstTarget.getTime() <= kstNow.getTime()) {
+                kstTarget.setDate(kstTarget.getDate() + 1);
             }
+
+            // 5. Delay 계산 (초 단위)
+            const diffMs = kstTarget.getTime() - kstNow.getTime();
+            const delay = Math.floor(diffMs / 1000);
+
+            // 로그 출력 (디버깅용)
+            // .toISOString()은 끝에 'Z'를 붙여 UTC로 표시하지만, 여기서는 값이 KST로 시프트된 상태임
+            // 헷갈리지 않게 문자열 치환하여 KST로 표기
+            const formatEpocToKstString = (dateObj: Date) => dateObj.toISOString().replace('Z', ' KST');
+
+            console.log('='.repeat(40));
+            console.log(`[Time Calc] Input Time: ${time}`);
+            console.log(`[Time Calc] Current KST: ${formatEpocToKstString(kstNow)}`);
+            console.log(`[Time Calc] Target  KST: ${formatEpocToKstString(kstTarget)}`);
+            console.log(`[Time Calc] Delay (sec): ${delay}`);
+            console.log('='.repeat(40));
 
             console.log('[Upstash] Attempting to publishJSON...');
 
