@@ -61,7 +61,7 @@ export default function MedicineSchedule() {
   const prevAllCheckedRef = useRef(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<TimeSlot>('dawn');
-  const { fcmToken } = useFcmToken();
+  const { fcmToken, requestToken } = useFcmToken();
   const [processingSlots, setProcessingSlots] = useState<Set<string>>(new Set());
 
   // 알람 상태 관리
@@ -191,20 +191,24 @@ export default function MedicineSchedule() {
     });
 
     try {
-      // FCM 토큰 검증
-      if (!fcmToken && newIsOn) {
-        // 토큰 없는데 켜려고 하면 경고 후 원상복구
-        alert('알림 서비스를 이용하려면 권한 허용이 필요합니다. 잠시 후 다시 시도해주세요.');
+      // FCM 토큰 검증 및 재시도
+      let tokenToSend = fcmToken;
+      if (!tokenToSend && newIsOn) {
+        console.log('Token missing, attempting to retrieve...');
+        tokenToSend = await requestToken();
 
-        setAlarmSettings((prev) => {
-          const reverted = {
-            ...prev,
-            [slot]: { ...prev[slot], isOn: !newIsOn }
-          };
-          safeSetItem('alarmSettings', JSON.stringify(reverted));
-          return reverted;
-        });
-        return;
+        if (!tokenToSend) {
+          alert('알림 권한을 먼저 허용해주세요.');
+          setAlarmSettings((prev) => {
+            const reverted = {
+              ...prev,
+              [slot]: { ...prev[slot], isOn: !newIsOn }
+            };
+            safeSetItem('alarmSettings', JSON.stringify(reverted));
+            return reverted;
+          });
+          return;
+        }
       }
 
       // (방어적 코드) 취소 시 notificationId가 없어도 API 호출을 진행하여 서버에서 처리하도록 함
@@ -212,7 +216,7 @@ export default function MedicineSchedule() {
       // 서버에서 기준 시간(KST)으로 정확히 계산하도록 원본 시간 문자열("HH:mm") 전송
       const payload = {
         action: newIsOn ? 'schedule' : 'cancel',
-        token: fcmToken,
+        token: tokenToSend,
         time: currentSetting.time, // "HH:mm" 예: "07:00"
         slotId: slot,
         heading: `${currentSetting.time} 약 복용 알림`,
@@ -281,13 +285,133 @@ export default function MedicineSchedule() {
     }
   }, [alarmSettings, fcmToken, processingSlots]);
 
-  // 알람 설정 저장
-  const handleAlarmSave = useCallback((newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {
-    setAlarmSettings(newSettings);
-    safeSetItem('alarmSettings', JSON.stringify(newSettings));
+  // 알람 설정 저장 (모달에서 '저장' 클릭 시)
+  const handleAlarmSave = useCallback(async (newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {
+    // 1. 낙관적 업데이트 (UI 즉시 반영)
+    // 기존 설정 보존(notificationId 등)하면서 새로운 시간/ON-OFF 상태 병합
+    setAlarmSettings((prev) => {
+      const merged: any = {};
+      (Object.keys(newSettings) as TimeSlot[]).forEach((slot) => {
+        merged[slot] = {
+          ...prev[slot],
+          time: newSettings[slot].time,
+          isOn: newSettings[slot].isOn,
+        };
+      });
+      safeSetItem('alarmSettings', JSON.stringify(merged));
+      return merged;
+    });
 
-    console.log('알람 설정 저장됨:', newSettings);
-  }, []);
+    // 2. 변경 사항 감지 및 API 호출 (비동기 처리)
+    for (const slotKey in newSettings) {
+      const slot = slotKey as TimeSlot;
+      const newSetting = newSettings[slot];
+      const oldSetting = alarmSettings[slot];
+
+      // 변경사항이 없으면 패스
+      if (newSetting.isOn === oldSetting.isOn && newSetting.time === oldSetting.time) {
+        continue;
+      }
+
+      // 처리 중 상태 표시 (중복 방지)
+      setProcessingSlots((prev) => new Set(prev).add(slot));
+
+      try {
+        // Case A: 켜짐 -> 꺼짐 (Cancel)
+        if (oldSetting.isOn && !newSetting.isOn) {
+          if (oldSetting.notificationId) {
+            await fetch('/api/schedule-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'cancel',
+                notificationId: oldSetting.notificationId,
+              }),
+            });
+          }
+          // ID 제거 업데이트
+          setAlarmSettings(prev => ({
+            ...prev,
+            [slot]: { ...prev[slot], notificationId: undefined }
+          }));
+        }
+
+        // Case B: 꺼짐 -> 켜짐 OR 시간 변경 (Schedule / Reschedule)
+        // 시간 변경 시에는 기존 것 취소 후 재예약 필요 (단, ID가 있으면 취소 시도)
+        if (newSetting.isOn) {
+          // 토큰 확인 및 재시도
+          let tokenToSend = fcmToken;
+          if (!tokenToSend) {
+            tokenToSend = await requestToken();
+            if (!tokenToSend) {
+              alert('알림 권한을 먼저 허용해주세요.');
+              // UI 원복 (OFF로)
+              setAlarmSettings(prev => {
+                const reverted = { ...prev, [slot]: { ...prev[slot], isOn: false } };
+                safeSetItem('alarmSettings', JSON.stringify(reverted));
+                return reverted;
+              });
+              continue;
+            }
+          }
+
+          // 재예약인 경우 기존 ID로 취소 먼저 시도 (API 내부적으로 처리하거나 여기서 명시적 호출)
+          if (oldSetting.isOn && oldSetting.notificationId) {
+            await fetch('/api/schedule-notification', {
+              method: 'POST',
+              body: JSON.stringify({ action: 'cancel', notificationId: oldSetting.notificationId }),
+            });
+          }
+
+          // 새 예약
+          const payload = {
+            action: 'schedule',
+            token: tokenToSend,
+            time: newSetting.time,
+            slotId: slot,
+            heading: `${newSetting.time} 약 복용 알림`,
+            content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
+          };
+
+          const res = await fetch('/api/schedule-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const result = await res.json();
+
+          if (result.success) {
+            setAlarmSettings(prev => {
+              const updated = {
+                ...prev,
+                [slot]: { ...prev[slot], notificationId: result.notificationId }
+              };
+              safeSetItem('alarmSettings', JSON.stringify(updated));
+              return updated;
+            });
+          } else {
+            // 실패 시 OFF 처리
+            console.error(`[Modal Save] Failed to schedule ${slot}:`, result);
+            setAlarmSettings(prev => {
+              const reverted = { ...prev, [slot]: { ...prev[slot], isOn: false } };
+              safeSetItem('alarmSettings', JSON.stringify(reverted));
+              return reverted;
+            });
+          }
+        }
+      } catch (e) {
+        console.error(`[Modal Save] Error processing ${slot}:`, e);
+      } finally {
+        setProcessingSlots((prev) => {
+          const next = new Set(prev);
+          next.delete(slot);
+          return next;
+        });
+      }
+    }
+
+    console.log('알람 설정 일괄 저장 및 동기화 완료');
+  }, [alarmSettings, fcmToken, requestToken]);
 
   // 체크 상태 변경 핸들러
   const handleMedicineChange = useCallback((id: string, checked: boolean) => {
