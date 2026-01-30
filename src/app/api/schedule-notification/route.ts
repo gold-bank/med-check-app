@@ -90,6 +90,7 @@ export async function POST(request: Request) {
                     content
                 },
                 delay: delay,
+                retries: 0, // 중복 방지를 위해 재시도 제한
             });
 
             console.log('[Upstash] Success! Message ID:', result.messageId);

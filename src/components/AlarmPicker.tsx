@@ -100,11 +100,22 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
         }));
     };
 
+    const [isSaving, setIsSaving] = useState(false);
+
     // 저장
-    const handleSave = () => {
+    const handleSave = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isSaving) return;
+        setIsSaving(true);
+
         // 이미 localSettings가 최신 상태이므로 그대로 저장
         onSave(localSettings);
+        // onClose는 부모에서 처리되는 시간에 따라 달라질 수 있으므로 약간의 지연 후 실행하거나 즉시 실행
+        // 여기서는 상위 로직이 비동기일 수 있으므로 close만 호출
         onClose();
+
+        // 짧은 타임아웃으로 더블 클릭 방지 해제 (모달이 닫히면 어차피 언마운트됨)
+        setTimeout(() => setIsSaving(false), 500);
     };
 
     if (!isOpen) return null;
@@ -193,8 +204,13 @@ export function AlarmPicker({ isOpen, onClose, alarmSettings, onSave, initialSlo
 
                 {/* 완료 버튼 */}
                 <div className="alarm-picker-footer">
-                    <button className="alarm-done-btn" onClick={handleSave}>
-                        설정 완료
+                    <button
+                        className="alarm-done-btn"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        style={{ opacity: isSaving ? 0.7 : 1 }}
+                    >
+                        {isSaving ? '저장 중...' : '설정 완료'}
                     </button>
                 </div>
             </div>

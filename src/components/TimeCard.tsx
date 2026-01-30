@@ -39,6 +39,7 @@ export function TimeCard({
     // 시계 클릭 시 알람 토글 (부모 이벤트 차단)
     const handleClockClick = (e: React.MouseEvent) => {
         e.stopPropagation();
+        e.preventDefault(); // 중복 터치/이벤트 방지
         if (onAlarmToggle) {
             onAlarmToggle();
         }

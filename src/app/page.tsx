@@ -59,6 +59,7 @@ export default function MedicineSchedule() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const prevAllCheckedRef = useRef(false);
+  const isSavingRef = useRef(false); // 전역 저장 락 (중복 호출 방지)
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<TimeSlot>('dawn');
   const { fcmToken, requestToken } = useFcmToken();
@@ -287,6 +288,10 @@ export default function MedicineSchedule() {
 
   // 알람 설정 저장 (모달에서 '저장' 클릭 시)
   const handleAlarmSave = useCallback(async (newSettings: Record<TimeSlot, { time: string; isOn: boolean }>) => {
+    // 중복 실행 방지
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+
     // 1. 낙관적 업데이트 (UI 즉시 반영)
     // 기존 설정 보존(notificationId 등)하면서 새로운 시간/ON-OFF 상태 병합
     setAlarmSettings((prev) => {
@@ -411,6 +416,8 @@ export default function MedicineSchedule() {
     }
 
     console.log('알람 설정 일괄 저장 및 동기화 완료');
+    // 약간의 딜레이 후 락 해제 (마지막 비동기 처리가 끝난 후 안전하게)
+    setTimeout(() => { isSavingRef.current = false; }, 1000);
   }, [alarmSettings, fcmToken, requestToken]);
 
   // 체크 상태 변경 핸들러
