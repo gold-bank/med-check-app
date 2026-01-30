@@ -121,6 +121,7 @@ export async function POST(request: Request) {
                 }
             };
 
+            console.log('실제 FCM 발송 실행'); // 중복 호출 확인용 로그
             const response = await admin.messaging().send(message);
             console.log('[Execute] FCM Sent Result:', response);
             return NextResponse.json({ success: true, messageId: response });
