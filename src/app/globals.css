@@ -1,6 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'DSEG7-Classic';
+  src: url('https://cdn.jsdelivr.net/gh/keshikan/DSEG@v0.46/fonts/DSEG7-Classic/DSEG7Classic-Bold.woff2') format('woff2');
+  font-weight: bold;
+  font-style: normal;
+}
+
 /* ===== 커스텀 테마 색상 (Tailwind CSS 4) ===== */
 @theme inline {
   --color-dawn: #FFB74D;
@@ -235,7 +242,7 @@ body {
   position: relative;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
-  padding: 8px 5px 12px 5px;
+  padding: 8px 0 12px 0;
   margin-top: -3px;
   align-self: flex-start;
   height: auto;
@@ -284,8 +291,11 @@ body {
 
 /* 전자시계 스타일 (배경 제거, 순수 숫자 강조) */
 .visual-clock {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 10px;
+  font-family: 'DSEG7-Classic', monospace !important;
+  font-size: 12px;
+  letter-spacing: 1px;
+  font-weight: bold;
+  font-style: italic;
   color: #333;
   background: none;
   padding: 0;
@@ -761,8 +771,11 @@ body {
 }
 
 .slot-time-display {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 13px;
+  font-family: 'DSEG7-Classic', monospace !important;
+  font-size: 16px;
+  letter-spacing: 1px;
+  font-weight: bold;
+  font-style: italic;
   color: #555;
   margin-right: 10px;
 }
@@ -772,9 +785,9 @@ body {
 }
 
 .slot-switch {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 12px;
   border: none;
   cursor: pointer;
@@ -784,7 +797,7 @@ body {
 }
 
 .slot-switch.on {
-  background: #333;
+  background: #1976D2;
   color: #fff;
 }
 
@@ -837,6 +850,8 @@ body {
   background: #fff;
   color: #222;
   text-align: center;
+  text-align-last: center;
+  padding: 12px;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
