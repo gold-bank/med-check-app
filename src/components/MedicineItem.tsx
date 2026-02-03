@@ -38,6 +38,7 @@ export function MedicineItem({
         disabled ? 'med-disabled' : '',
         !disabled && !checked && isActiveToday ? 'med-active-today' : '',
         !disabled && !checked && isDanger ? 'med-active-danger' : '',
+        !disabled && !checked && showFolicWarning ? 'med-folic-active' : '',
     ].filter(Boolean).join(' ');
 
     const labelClasses = [

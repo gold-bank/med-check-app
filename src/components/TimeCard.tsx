@@ -84,22 +84,20 @@ export function TimeCard({
                 </div>
                 {notes.length > 0 && (
                     <div className="content-checks">
-                        {notes.map((note, index) => {
-                            const isHighlight = note.includes('X') || note.includes('1번만');
-                            return (
-                                <div key={index} className="check-item">
-                                    <span className="check-bullet">▸</span>
-                                    {isHighlight ? (
-                                        <span>
-                                            <span className="highlight">{note.split(' (')[0]}</span>
-                                            {note.includes(' (') && ` (${note.split(' (')[1]}`}
-                                        </span>
-                                    ) : (
-                                        <span>{note}</span>
+                        {notes.map((note, index) => (
+                            <div key={index} className="check-item">
+                                <span className="check-bullet">▸</span>
+                                <span>
+                                    {note.split(/(\*\*.*?\*\*)/).map((part, i) =>
+                                        part.startsWith('**') && part.endsWith('**') ? (
+                                            <span key={i} className="highlight">{part.slice(2, -2)}</span>
+                                        ) : (
+                                            <span key={i}>{part}</span>
+                                        )
                                     )}
-                                </div>
-                            );
-                        })}
+                                </span>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

@@ -32,13 +32,13 @@ export const TIME_SLOTS: TimeSlotInfo[] = [
         id: 'morning',
         label: '아침 식사',
         icon: 'morning',
-        notes: ['소화효소: 식사 시작 직후', '화요일 아침 복용 X (저녁으로!)'],
+        notes: ['소화효소: 식사 시작 직후', '**엽산은 화요일 아침 복용 X (저녁으로!)**'],
     },
     {
         id: 'noon',
         label: '점심 식사',
         icon: 'sun',
-        notes: ['골다공증 예방 최강 조합', '비타민 D3는 3일에 1번만'],
+        notes: ['골다공증 예방 최강 조합', '**비타민 D3는 3일에 1번만**'],
     },
     {
         id: 'snack',

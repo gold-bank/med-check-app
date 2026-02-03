@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Bell } from 'lucide-react';
 
+import { BUILD_DATE } from '../lib/buildInfo';
+
 interface HeaderProps {
     onReset: () => void;
     onAlarmSettingClick?: () => void;
@@ -12,8 +14,7 @@ interface HeaderProps {
 export function Header({ onReset, onAlarmSettingClick }: HeaderProps) {
     const [isUpdating, setIsUpdating] = useState(false);
 
-    const today = new Date();
-    const dateString = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+    const dateString = BUILD_DATE;
 
     const handleForceUpdate = () => {
         setIsUpdating(true);
