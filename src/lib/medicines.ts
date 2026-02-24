@@ -92,7 +92,6 @@ export const BASE_MEDICINES: Medicine[] = [
 
     // 저녁 식사
     { id: 'med14', name: '소화효소', dose: '1알 (베이직)', slot: 'evening' },
-    { id: 'med15', name: '류마티스 처방약', dose: '(저녁분)', slot: 'evening' },
     { id: 'med16', name: '더리얼 오메가-3', dose: '1알 (1250mg)', slot: 'evening' },
     {
         id: 'med_mtx',
