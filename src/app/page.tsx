@@ -19,7 +19,7 @@ const DEFAULT_ALARM_TIMES: Record<TimeSlot, string> = {
   noon: '12:00',
   snack: '15:00',
   evening: '18:00',
-  night: '22:00',
+  night: '18:30',
 };
 
 // D3 사이클 계산
@@ -98,11 +98,23 @@ export default function MedicineSchedule() {
       }
     });
 
-    // 각 시간대 내 정렬 (D3, MTX는 마지막에)
+    // 각 시간대 내 정렬 (화요일 이동 엽산은 맨 아래에서 2번째)
+    // 현재 저녁 사이클은 MTX 뿐이므로, MTX가 맨 아래, 엽산이 그 위가 되도록 정렬
     Object.keys(result).forEach((slot) => {
       result[slot as TimeSlot].sort((a, b) => {
-        if (a.cycleType && !b.cycleType) return 1;
-        if (!a.cycleType && b.cycleType) return -1;
+        const aIsCycle = !!a.cycleType;
+        const bIsCycle = !!b.cycleType;
+        const aIsMovedFolate = isTuesday && a.tuesdayEvening;
+        const bIsMovedFolate = isTuesday && b.tuesdayEvening;
+
+        // 사이클 약물(MTX)은 무조건 맨 끝으로
+        if (aIsCycle && !bIsCycle) return 1;
+        if (!aIsCycle && bIsCycle) return -1;
+
+        // 이동된 엽산은 사이클 약물 바로 위(즉, 일반 약물들 중 가장 끝)로
+        if (aIsMovedFolate && !bIsMovedFolate) return 1;
+        if (!aIsMovedFolate && bIsMovedFolate) return -1;
+
         return 0;
       });
     });

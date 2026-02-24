@@ -22,11 +22,6 @@ export const metadata: Metadata = {
     icon: "/pill-icon.png",
     apple: "/pill-icon.png",
   },
-  other: {
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0",
-  },
 };
 
 export const viewport: Viewport = {
@@ -37,6 +32,8 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 };
 
+import { PwaUpdater } from "@/components/PwaUpdater";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -44,13 +41,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <head>
-        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-        <meta httpEquiv="Pragma" content="no-cache" />
-        <meta httpEquiv="Expires" content="0" />
-      </head>
       <body>
-
+        <PwaUpdater />
         {children}
       </body>
     </html>
