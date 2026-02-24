@@ -16,17 +16,8 @@ export function Header({ onReset, onAlarmSettingClick }: HeaderProps) {
 
     const dateString = BUILD_DATE;
 
-    const handleForceUpdate = async () => {
+    const handleForceUpdate = () => {
         setIsUpdating(true);
-
-        if ('serviceWorker' in navigator) {
-            try {
-                const reg = await navigator.serviceWorker.ready;
-                await reg.update();
-            } catch (error) {
-                console.error('Service Worker 업데이트 실패:', error);
-            }
-        }
 
         setTimeout(() => {
             const baseUrl = window.location.href.split('?')[0];
