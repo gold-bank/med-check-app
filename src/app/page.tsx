@@ -7,7 +7,7 @@ import { MedicineItem } from '@/components/MedicineItem';
 import { AlertSection } from '@/components/AlertSection';
 import { Confetti } from '@/components/Confetti';
 import { AlarmPicker } from '@/components/AlarmPicker';
-import { safeGetItem, safeSetItem, safeClear } from '@/lib/storage';
+import { safeGetItem, safeSetItem, safeClear, safeRemoveItem } from '@/lib/storage';
 import { BASE_MEDICINES, TIME_SLOTS, type TimeSlot, type Medicine } from '@/lib/medicines';
 import useFcmToken from '@/hooks/useFcmToken';
 
@@ -133,11 +133,23 @@ export default function MedicineSchedule() {
     }
     setDeviceId(storedDevId);
 
+    // 날짜 체크 (자정 경과 시 초기화)
+    const nowKst = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+    const todayDateStr = `${nowKst.getUTCFullYear()}${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}${String(nowKst.getUTCDate()).padStart(2, '0')}`;
+    const lastVisitDate = safeGetItem('last_visit_date');
+    const isNewDay = lastVisitDate !== todayDateStr;
+    safeSetItem('last_visit_date', todayDateStr);
+
     const loadedState: Record<string, boolean> = {};
     BASE_MEDICINES.forEach((med) => {
-      const value = safeGetItem(med.id);
-      if (value !== null) {
-        loadedState[med.id] = value === '1';
+      if (isNewDay) {
+        safeRemoveItem(med.id);
+        loadedState[med.id] = false;
+      } else {
+        const value = safeGetItem(med.id);
+        if (value !== null) {
+          loadedState[med.id] = value === '1';
+        }
       }
     });
     setCheckedItems(loadedState);
@@ -497,11 +509,39 @@ export default function MedicineSchedule() {
 
   // 초기화 핸들러
   const handleReset = useCallback(() => {
-    safeClear();
+    // 주의: 전체 clear를 하면 알람 스위치 설정과 device_id도 날아가므로,
+    // 오로지 약물의 체크 상태만 초기화합니다.
+    BASE_MEDICINES.forEach((med) => {
+      safeRemoveItem(med.id);
+    });
     setCheckedItems({});
     setShowConfetti(false);
     prevAllCheckedRef.current = false;
   }, []);
+
+  // 자정(다음 날)이 지났을 때 자동 갱신되는 로직 (앱을 계속 켜두었을 경우 대비)
+  useEffect(() => {
+    if (!isLoaded) return;
+    const interval = setInterval(() => {
+      const nowKst = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+      const todayDateStr = `${nowKst.getUTCFullYear()}${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}${String(nowKst.getUTCDate()).padStart(2, '0')}`;
+      const lastVisitDate = safeGetItem('last_visit_date');
+
+      if (lastVisitDate && lastVisitDate !== todayDateStr) {
+        console.log('[Auto Reset] 자정 경과, 자동 초기화 진행');
+        safeSetItem('last_visit_date', todayDateStr);
+
+        BASE_MEDICINES.forEach((med) => {
+          safeRemoveItem(med.id);
+        });
+        setCheckedItems({});
+        setShowConfetti(false);
+        prevAllCheckedRef.current = false;
+      }
+    }, 60000); // 1분마다 주기적으로 체크
+
+    return () => clearInterval(interval);
+  }, [isLoaded]);
 
   // 모든 항목 체크 여부 확인 (Confetti 트리거)
   useEffect(() => {
