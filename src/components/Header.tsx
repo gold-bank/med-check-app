@@ -9,15 +9,24 @@ import { BUILD_DATE } from '../lib/buildInfo';
 interface HeaderProps {
     onReset: () => void;
     onAlarmSettingClick?: () => void;
+    onForceUpdate?: () => Promise<void>;
 }
 
-export function Header({ onReset, onAlarmSettingClick }: HeaderProps) {
+export function Header({ onReset, onAlarmSettingClick, onForceUpdate }: HeaderProps) {
     const [isUpdating, setIsUpdating] = useState(false);
 
     const dateString = BUILD_DATE;
 
     const handleForceUpdate = async () => {
         setIsUpdating(true);
+
+        if (onForceUpdate) {
+            try {
+                await onForceUpdate();
+            } catch (err) {
+                console.error('onForceUpdate error:', err);
+            }
+        }
 
         if ('serviceWorker' in navigator) {
             try {

@@ -643,6 +643,65 @@ export default function MedicineSchedule() {
     );
   };
 
+  // 강제 업데이트 시 알람 재등록 로직 (기기 고유 ID 누락된 기존 사용자 마이그레이션 용도)
+  const handleForceUpdateApp = useCallback(async () => {
+    const activeSlots = (Object.keys(alarmSettings) as TimeSlot[]).filter(slot => alarmSettings[slot].isOn);
+    if (activeSlots.length === 0) return;
+
+    let tokenToSend = fcmToken;
+    if (!tokenToSend) {
+      tokenToSend = await requestToken();
+      if (!tokenToSend) return;
+    }
+
+    await Promise.all(activeSlots.map(async (slot) => {
+      const setting = alarmSettings[slot];
+
+      // 1. 기존 예약을 취소 (만약 실패해도 계속 진행)
+      if (setting.notificationId) {
+        try {
+          await fetch('/api/schedule-notification', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'cancel', notificationId: setting.notificationId }),
+          });
+        } catch (e) { }
+      }
+
+      // 2. 현재 상태 정보(특히 최신 deviceId)를 담아 새롭게 예약
+      try {
+        const payload = {
+          action: 'schedule',
+          token: tokenToSend,
+          time: setting.time,
+          slotId: slot,
+          deviceId: deviceId,
+          heading: `${setting.time} 약 복용 알림`,
+          content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
+        };
+
+        const res = await fetch('/api/schedule-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await res.json();
+
+        // 3. (옵션) 결과가 성공적이면 설정 업데이트. 
+        // 그러나 업데이트 후 페이지가 어차피 리로드되므로 localStorage에만 안전하게 반영해둬도 무방합니다.
+        if (result.success) {
+          const rawStore = localStorage.getItem('alarmSettings');
+          if (rawStore) {
+            const parsed = JSON.parse(rawStore);
+            parsed[slot].notificationId = result.notificationId;
+            localStorage.setItem('alarmSettings', JSON.stringify(parsed));
+          }
+        }
+      } catch (e) {
+        console.error('Update schedule migrate error', e);
+      }
+    }));
+  }, [alarmSettings, fcmToken, requestToken, deviceId]);
+
   if (!isLoaded) {
     return (
       <div className="main-container">
@@ -655,25 +714,33 @@ export default function MedicineSchedule() {
     <>
       <Confetti trigger={showConfetti} />
       <div className="main-container">
-        <Header onReset={handleReset} onAlarmSettingClick={handleAlarmSettingClick} />
+        <Header
+          onReset={handleReset}
+          onAlarmSettingClick={handleAlarmSettingClick}
+          onForceUpdate={handleForceUpdateApp}
+        />
 
         <div className="schedule-flow">
-          {TIME_SLOTS.map((slot) => (
-            <TimeCard
-              key={slot.id}
-              slotId={slot.id}
-              label={slot.label}
-              iconName={slot.icon}
-              notes={slot.notes}
-              allChecked={isGroupChecked(slot.id)}
-              onGroupToggle={() => handleGroupToggle(slot.id)}
-              alarmTime={alarmSettings[slot.id].time}
-              isAlarmOn={alarmSettings[slot.id].isOn}
-              onAlarmToggle={() => handleClockToggle(slot.id)}
-            >
-              {medicinesBySlot[slot.id].map(renderMedicine)}
-            </TimeCard>
-          ))}
+          {TIME_SLOTS.map((slot) => {
+            const allChecked = isGroupChecked(slot.id);
+            return (
+              <TimeCard
+                key={slot.id}
+                slotId={slot.id}
+                label={slot.label}
+                iconName={slot.icon}
+                notes={slot.notes}
+                allChecked={allChecked}
+                onGroupToggle={() => handleGroupToggle(slot.id)}
+                alarmTime={alarmSettings[slot.id].time}
+                // 그룹 전체 완료 시 표면상으로만 종 아이콘을 끕니다
+                isAlarmOn={alarmSettings[slot.id].isOn && !allChecked}
+                onAlarmToggle={() => handleClockToggle(slot.id)}
+              >
+                {medicinesBySlot[slot.id].map(renderMedicine)}
+              </TimeCard>
+            );
+          })}
         </div>
 
         <AlertSection />
