@@ -64,6 +64,7 @@ export default function MedicineSchedule() {
   const [initialSlot, setInitialSlot] = useState<TimeSlot>('dawn');
   const { fcmToken, requestToken } = useFcmToken();
   const [processingSlots, setProcessingSlots] = useState<Set<string>>(new Set());
+  const [deviceId, setDeviceId] = useState<string>('');
 
   // 알람 상태 관리
   const [alarmSettings, setAlarmSettings] = useState<Record<TimeSlot, { time: string; isOn: boolean; notificationId?: string }>>({
@@ -124,6 +125,14 @@ export default function MedicineSchedule() {
 
   // localStorage에서 상태 로드
   useEffect(() => {
+    // 기기 고유 ID 발급 및 로드
+    let storedDevId = safeGetItem('device_id');
+    if (!storedDevId) {
+      storedDevId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+      safeSetItem('device_id', storedDevId);
+    }
+    setDeviceId(storedDevId);
+
     const loadedState: Record<string, boolean> = {};
     BASE_MEDICINES.forEach((med) => {
       const value = safeGetItem(med.id);
@@ -232,6 +241,7 @@ export default function MedicineSchedule() {
         token: tokenToSend,
         time: currentSetting.time, // "HH:mm" 예: "07:00"
         slotId: slot,
+        deviceId: deviceId,
         heading: `${currentSetting.time} 약 복용 알림`,
         content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
         notificationId: currentSetting.notificationId || '', // 없는 경우 빈 문자열 전송
@@ -386,6 +396,7 @@ export default function MedicineSchedule() {
             token: tokenToSend,
             time: newSetting.time,
             slotId: slot,
+            deviceId: deviceId,
             heading: `${newSetting.time} 약 복용 알림`,
             content: '약 드실 시간입니다! 잊지 말고 챙겨주세요.',
           };
@@ -515,6 +526,38 @@ export default function MedicineSchedule() {
 
     prevAllCheckedRef.current = allChecked;
   }, [checkedItems, isLoaded]);
+
+  // 약 복용 완료 상태를 서버 DB에 동기화 (알림 스킵을 위함)
+  const prevSyncStateRef = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!isLoaded || !deviceId) return;
+
+    const nowKst = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+    const yyyy = nowKst.getUTCFullYear();
+    const mm = String(nowKst.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(nowKst.getUTCDate()).padStart(2, '0');
+    const todayDate = `${yyyy}${mm}${dd}`;
+
+    TIME_SLOTS.forEach((slotInfo) => {
+      const slot = slotInfo.id;
+      const checked = isGroupChecked(slot);
+
+      if (prevSyncStateRef.current[slot] !== checked) {
+        const isInitial = prevSyncStateRef.current[slot] === undefined;
+        prevSyncStateRef.current[slot] = checked;
+
+        // 맨 처음 로딩됐을 때 'false' 상태인 건 굳이 DB를 지울 필요 없음
+        if (isInitial && !checked) return;
+
+        fetch('/api/medicine-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId, slotId: slot, date: todayDate, checked })
+        }).catch(err => console.error('[DB Sync Error]', err));
+      }
+    });
+  }, [checkedItems, isGroupChecked, isLoaded, deviceId]);
 
   // 약 아이템 렌더링
   const renderMedicine = (med: Medicine) => {

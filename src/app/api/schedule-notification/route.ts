@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        const { action, token, time, heading, content, notificationId } = body;
+        const { action, token, time, heading, content, notificationId, deviceId, slotId } = body;
         console.log(`[API] Received action: ${action}, Time: ${time}`);
 
         // 1. 환경 변수 체크
@@ -40,66 +40,70 @@ export async function POST(request: Request) {
 
         // 2. 알림 예약 (Schedule)
         if (action === 'schedule') {
-            if (!token || !time) {
-                console.error('[API Error] Missing token or time for schedule');
-                return NextResponse.json({ error: 'Missing token or time' }, { status: 400 });
+            if (!token || !time || !deviceId || !slotId) {
+                console.error('[API Error] Missing token, time, deviceId, or slotId for schedule');
+                return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
             }
 
-            // --- KST 시간 계산 (서버 시간 기반) ---
-            // 1. 현재 한국 시간 구하기 (UTC + 9시간)
-            const now = new Date();
-            const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-
-            // 2. 목표 시간 파싱 ("HH:mm")
+            // --- KST 시간을 UTC CRON으로 변환 ---
             const [targetHour, targetMinute] = time.split(':').map(Number);
-
-            // 3. 목표 한국 시간 객체 생성
-            const kstTarget = new Date(kstNow);
-            kstTarget.setHours(targetHour, targetMinute, 0, 0);
-
-            // 4. 이미 지났으면 내일로 설정
-            if (kstTarget.getTime() <= kstNow.getTime()) {
-                kstTarget.setDate(kstTarget.getDate() + 1);
+            let utcHour = targetHour - 9;
+            if (utcHour < 0) {
+                utcHour += 24;
             }
-
-            // 5. Delay 계산 (초 단위)
-            const diffMs = kstTarget.getTime() - kstNow.getTime();
-            const delay = Math.floor(diffMs / 1000);
-
-            // 로그 출력 (디버깅용)
-            // .toISOString()은 끝에 'Z'를 붙여 UTC로 표시하지만, 여기서는 값이 KST로 시프트된 상태임
-            // 헷갈리지 않게 문자열 치환하여 KST로 표기
-            const formatEpocToKstString = (dateObj: Date) => dateObj.toISOString().replace('Z', ' KST');
+            const cronString = `${targetMinute} ${utcHour} * * *`;
 
             console.log('='.repeat(40));
-            console.log(`[Time Calc] Input Time: ${time}`);
-            console.log(`[Time Calc] Current KST: ${formatEpocToKstString(kstNow)}`);
-            console.log(`[Time Calc] Target  KST: ${formatEpocToKstString(kstTarget)}`);
-            console.log(`[Time Calc] Delay (sec): ${delay}`);
+            console.log(`[Time Calc] Input Time (KST): ${time}`);
+            console.log(`[Time Calc] CRON (UTC): ${cronString}`);
             console.log('='.repeat(40));
 
-            console.log('[Upstash] Attempting to publishJSON...');
+            console.log('[Upstash] Attempting to create schedule...');
 
-            // Upstash에 메시지 예약 발행
-            const result = await qstashClient.publishJSON({
-                url: `${process.env.APP_URL}/api/schedule-notification`,
-                body: {
+            // Upstash에 매일 반복 예약(CRON)
+            const result = await qstashClient.schedules.create({
+                destination: `${process.env.APP_URL}/api/schedule-notification`,
+                body: JSON.stringify({
                     action: 'execute-send',
                     token,
                     heading,
-                    content
-                },
-                delay: delay,
-                retries: 0, // 중복 방지를 위해 재시도 제한
+                    content,
+                    deviceId,
+                    slotId
+                }),
+                cron: cronString,
             });
 
-            console.log('[Upstash] Success! Message ID:', result.messageId);
-            return NextResponse.json({ success: true, notificationId: result.messageId });
+            console.log('[Upstash] Success! Schedule ID:', result.scheduleId);
+            return NextResponse.json({ success: true, notificationId: result.scheduleId });
         }
 
         // 3. 알림 실행 (Execute Send - Called by QStash)
         else if (action === 'execute-send') {
             console.log('[Execute] Sending actual FCM notification...');
+
+            // DB 체킹(도장 확인)
+            if (deviceId && slotId) {
+                const nowKst = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+                const yyyy = nowKst.getUTCFullYear();
+                const mm = String(nowKst.getUTCMonth() + 1).padStart(2, '0');
+                const dd = String(nowKst.getUTCDate()).padStart(2, '0');
+                const todayDate = `${yyyy}${mm}${dd}`;
+
+                const docId = `${deviceId}_${slotId}_${todayDate}`;
+                const db = admin.firestore();
+
+                try {
+                    const docSnap = await db.collection('medicine_checks').doc(docId).get();
+                    if (docSnap.exists && docSnap.data()?.checked) {
+                        console.log(`[Execute] Skipped FCM! User (${deviceId}) already took ${slotId} medicine today.`);
+                        return NextResponse.json({ success: true, message: 'Skipped - already checked' });
+                    }
+                } catch (e) {
+                    console.error('[Execute DB Check Error]', e);
+                    // 에러가 나더라도 알람은 발송되도록 계속 진행
+                }
+            }
 
             const message = {
                 token: token,
@@ -129,21 +133,25 @@ export async function POST(request: Request) {
 
         // 4. 알림 취소 (Cancel)
         else if (action === 'cancel') {
-            console.log(`[Cancel] Request to delete Msg ID: ${notificationId}`);
+            console.log(`[Cancel] Request to delete ID: ${notificationId}`);
 
-            // ID가 없어도 에러 처리하지 않고 성공으로 간주 (방어적 코드)
             if (!notificationId) {
                 console.log('[Cancel] No notificationId provided. Skipping QStash deletion, but returning success.');
                 return NextResponse.json({ success: true, message: 'No ID to cancel, skipping' });
             }
 
             try {
-                await qstashClient.messages.delete(notificationId);
-                console.log('[Cancel] QStash Message deleted successfully:', notificationId);
+                if (notificationId.startsWith('msg_')) {
+                    // 구버전(단일 메시지) 삭제
+                    await qstashClient.messages.delete(notificationId);
+                } else {
+                    // 신버전(CRON 스케줄) 삭제
+                    await qstashClient.schedules.delete(notificationId);
+                }
+                console.log('[Cancel] QStash resource deleted successfully:', notificationId);
                 return NextResponse.json({ success: true });
             } catch (e: any) {
-                // 이미 삭제되었거나 존재하지 않는 경우도 성공으로 처리
-                console.warn('[Cancel] Failed to delete QStash message (might be already sent/deleted):', e.message);
+                console.warn('[Cancel] Failed to delete QStash resource (might be already sent/deleted):', e.message);
                 return NextResponse.json({ success: true, warning: 'Message not found or already executed' });
             }
         }
