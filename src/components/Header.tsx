@@ -16,12 +16,35 @@ export function Header({ onReset, onAlarmSettingClick }: HeaderProps) {
 
     const dateString = BUILD_DATE;
 
-    const handleForceUpdate = () => {
+    const handleForceUpdate = async () => {
         setIsUpdating(true);
+
+        if ('serviceWorker' in navigator) {
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (const registration of registrations) {
+                    await registration.update(); // Try to update first
+                    await registration.unregister(); // Unregister to force fresh fetch on reload
+                }
+            } catch (err) {
+                console.error('SW update/unregister error:', err);
+            }
+        }
+
+        if ('caches' in window) {
+            try {
+                const cacheNames = await caches.keys();
+                for (const cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                }
+            } catch (err) {
+                console.error('Cache delete error:', err);
+            }
+        }
 
         setTimeout(() => {
             const baseUrl = window.location.href.split('?')[0];
-            window.location.replace(`${baseUrl}?v=${Date.now()}`);
+            window.location.replace(`${baseUrl}?t=${Date.now()}`);
         }, 500);
     };
 
